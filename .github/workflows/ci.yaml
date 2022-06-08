@@ -6,7 +6,7 @@ on:
     types: [ assigned, opened, synchronize, reopened, labeled ]
 jobs:
   linux_build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
       - uses: bazelbuild/setup-bazelisk@v2
