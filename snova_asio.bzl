@@ -72,29 +72,6 @@ cc_library(
         build_file = clean_dep("//:bazel/spdlog.BUILD"),
     )
 
-    _BOOST_ENDIAN_BUILD_FILE = """
-cc_library(
-    name = "endian",
-    hdrs = glob([
-        "**/*.ipp",
-        "**/*.hpp",
-    ]),
-    includes=["./include"],
-    visibility = [ "//visibility:public" ],
-)
-"""
-    boost_ver = kwargs.get("boost_ver", "1.79.0")
-    endian_boost_name = "endian-boost-{ver}".format(ver = boost_ver)
-    http_archive(
-        name = "com_github_boost_endian",
-        strip_prefix = endian_boost_name,
-        urls = [
-            "https://mirrors.tencent.com/github.com/boostorg/endian/archive/boost-{ver}.tar.gz".format(ver = boost_ver),
-            "https://github.com/boostorg/endian/archive/boost-{ver}.tar.gz".format(ver = boost_ver),
-        ],
-        build_file_content = _BOOST_ENDIAN_BUILD_FILE,
-    )
-
     mbedtls_ver = kwargs.get("mbedtls_ver", "3.1.0")
     mbedtls_name = "mbedtls-{ver}".format(ver = mbedtls_ver)
     http_archive(

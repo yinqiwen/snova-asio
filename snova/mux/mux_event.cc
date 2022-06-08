@@ -27,19 +27,47 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/mux/mux_event.h"
-#include "boost/endian/conversion.hpp"
+#include "absl/base/internal/endian.h"
+// #include "boost/endian/conversion.hpp"
 #include "snova/log/log_macros.h"
 
 namespace snova {
+
+template <typename T>
+static T native_to_big(T v) {
+  if constexpr (std::is_same_v<uint64_t, T>) {
+    return absl::ghtonll(v);
+  } else if constexpr (std::is_same_v<uint32_t, T>) {
+    return absl::ghtonl(v);
+  } else if constexpr (std::is_same_v<uint16_t, T>) {
+    return absl::ghtons(v);
+  } else {
+    static_assert(sizeof(T) == std::size_t(-1), "Not support integer type.");
+  }
+}
+
+template <typename T>
+static T big_to_native(T v) {
+  if constexpr (std::is_same_v<uint64_t, T>) {
+    return absl::gntohll(v);
+  } else if constexpr (std::is_same_v<uint32_t, T>) {
+    return absl::gntohl(v);
+  } else if constexpr (std::is_same_v<uint16_t, T>) {
+    return absl::gntohs(v);
+  } else {
+    static_assert(sizeof(T) == std::size_t(-1), "Not support integer type.");
+  }
+}
+
 int MuxEventHead::Encode(MutableBytes& buffer) {
   if (buffer.size() < kEventHeadSize) {
     SNOVA_ERROR("No enoght space to encode head.");
     return -1;
   }
-  uint32_t id = boost::endian::native_to_big(this->sid);
+  uint32_t id = native_to_big(this->sid);
   memcpy(buffer.data(), &id, sizeof(id));
   size_t pos = sizeof(id);
-  uint16_t length = boost::endian::native_to_big(this->len);
+  uint16_t length = native_to_big(this->len);
   memcpy(buffer.data() + pos, &length, sizeof(length));
   pos += sizeof(length);
   buffer.data()[pos] = this->type;
@@ -52,11 +80,11 @@ int MuxEventHead::Decode(const Bytes& buffer) {
   }
   uint32_t sid;
   memcpy(&sid, buffer.data(), sizeof(sid));
-  this->sid = boost::endian::big_to_native(sid);
+  this->sid = big_to_native(sid);
   size_t pos = sizeof(sid);
   uint16_t len;
   memcpy(&len, buffer.data() + pos, sizeof(len));
-  this->len = boost::endian::big_to_native(len);
+  this->len = big_to_native(len);
   pos += sizeof(len);
   this->type = buffer.data()[pos];
   return 0;
@@ -102,7 +130,7 @@ std::unique_ptr<MuxEvent> MuxEvent::NewEvent(MuxEventHead h) {
 
 template <typename T>
 static void encode_int(MutableBytes& buffer, size_t pos, T v) {
-  T enc = boost::endian::native_to_big(v);
+  T enc = native_to_big(v);
   memcpy(buffer.data() + pos, &enc, sizeof(enc));
 }
 
@@ -112,7 +140,7 @@ static int decode_int(const Bytes& buffer, size_t pos, T& v) {
     return ERR_TOO_SMALL_EVENT_DECODE_CONTENT;
   }
   memcpy(&v, buffer.data() + pos, sizeof(v));
-  v = boost::endian::big_to_native(v);
+  v = big_to_native(v);
   return 0;
 }
 
