@@ -5,16 +5,9 @@ on:
   pull_request:
     types: [ assigned, opened, synchronize, reopened, labeled ]
 jobs:
-  linux_build:
-    runs-on: ubuntu-latest
+  windows_build:
+    runs-on: windows-latest
     steps:
-      - run:   |
-         sudo apt update
-         sudo apt install gcc-11 g++-11
-        shell: bash
       - uses: actions/checkout@v3
       - uses: bazelbuild/setup-bazelisk@v2
-      - run: bazel build --cxxopt=-std=c++2a --cxxopt=-fcoroutines ...
-        env:
-            CC: gcc-11
-            CXX: g++-11
+      - run: bazel build --cxxopt=/std:c++20 //...
