@@ -17,7 +17,7 @@ cc_binary(
     linkopts = SNOVA_DEFAULT_LINKOPTS,
     linkstatic = 1,
     malloc = select({
-        "@bazel_tools//src/conditions:windows": "@com_github_microsoft_mimalloc:mimalloc_override",
+        "@bazel_tools//src/conditions:windows": "@com_github_microsoft_mimalloc//:mimalloc_override",
         "//conditions:default": "@com_github_jemalloc//:jemalloc",
     }),
     deps = [
@@ -39,7 +39,7 @@ cc_binary(
     linkstatic = 1,
     malloc = select({
         # "@bazel_tools//src/conditions:windows": "@bazel_tools//tools/cpp:malloc",
-        "@bazel_tools//src/conditions:windows": "@com_github_microsoft_mimalloc:mimalloc_override",
+        "@bazel_tools//src/conditions:windows": "@com_github_microsoft_mimalloc//:mimalloc_override",
         "//conditions:default": "@com_github_jemalloc//:jemalloc",
     }),
     deps = [
