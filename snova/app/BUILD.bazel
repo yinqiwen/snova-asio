@@ -1,0 +1,56 @@
+load(
+    "//snova:copts/configure_copts.bzl",
+    "SNOVA_DEFAULT_COPTS",
+    "SNOVA_DEFAULT_LINKOPTS",
+)
+
+package(
+    default_visibility = ["//visibility:public"],
+)
+
+cc_binary(
+    name = "snova-local",
+    srcs = [
+        "local_snova.cc",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    linkopts = SNOVA_DEFAULT_LINKOPTS,
+    linkstatic = 1,
+    deps = [
+        "//snova/log:log_api",
+        "//snova/mux:mux_client",
+        "//snova/server:local_server",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/flags:parse",
+    ],
+)
+
+cc_binary(
+    name = "snova-remote",
+    srcs = [
+        "remote_snova.cc",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    linkopts = SNOVA_DEFAULT_LINKOPTS,
+    linkstatic = 1,
+    deps = [
+        "//snova/log:log_api",
+        "//snova/server:remote_server",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/flags:parse",
+    ],
+)
+
+# cc_binary(
+#     name = "mbedtls",
+#     srcs = [
+#         "mbedtls.cc",
+#     ],
+#     copts = SNOVA_DEFAULT_COPTS,
+#     linkopts = SNOVA_DEFAULT_LINKOPTS,
+#     linkstatic = 1,
+#     deps = [
+#         "//snova/log:log_api",
+#         "@com_github_mbedtls//:mbedtls",
+#     ],
+# )

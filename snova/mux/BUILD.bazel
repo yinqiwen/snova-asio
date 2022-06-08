@@ -1,0 +1,125 @@
+load(
+    "//snova:copts/configure_copts.bzl",
+    "SNOVA_DEFAULT_COPTS",
+    "SNOVA_DEFAULT_LINKOPTS",
+)
+load("@rules_cc//cc:defs.bzl", "cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "mux_client",
+    srcs = [
+        "mux_client.cc",
+    ],
+    hdrs = [
+        "mux_client.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        ":mux_connection",
+        "//snova/io",
+        "//snova/log:log_api",
+        "//snova/util:net_helper",
+        "@asio",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "mux_server",
+    srcs = [
+        "mux_server.cc",
+    ],
+    hdrs = [
+        "mux_server.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        ":mux_connection",
+        "//snova/log:log_api",
+        "@asio",
+        "@com_google_absl//absl/container:flat_hash_map",
+    ],
+)
+
+cc_library(
+    name = "cipher_context",
+    srcs = [
+        "cipher_context.cc",
+    ],
+    hdrs = [
+        "cipher_context.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        ":mux_event",
+        "//snova/io",
+        "//snova/log:log_api",
+        "@com_github_mbedtls//:mbedtls",
+    ],
+)
+
+cc_test(
+    name = "cipher_context_test",
+    # size = "small",
+    srcs = ["cipher_context_test.cc"],
+    copts = SNOVA_DEFAULT_COPTS,
+    linkopts = SNOVA_DEFAULT_LINKOPTS,
+    deps = [
+        ":cipher_context",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "mux_event",
+    srcs = [
+        "mux_event.cc",
+    ],
+    hdrs = [
+        "mux_event.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        "//snova/io",
+        "//snova/log:log_api",
+    ],
+)
+
+cc_library(
+    name = "mux_stream",
+    srcs = [
+        "mux_stream.cc",
+    ],
+    hdrs = [
+        "mux_stream.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        ":mux_event",
+        "//snova/io",
+        "//snova/log:log_api",
+        "@com_google_absl//absl/container:flat_hash_map",
+    ],
+)
+
+cc_library(
+    name = "mux_connection",
+    srcs = [
+        "mux_connection.cc",
+    ],
+    hdrs = [
+        "mux_connection.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        ":cipher_context",
+        ":mux_stream",
+        "@asio",
+        "@com_google_absl//absl/random",
+    ],
+)

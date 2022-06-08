@@ -1,0 +1,32 @@
+load(
+    "//snova:copts/configure_copts.bzl",
+    "SNOVA_DEFAULT_COPTS",
+    "SNOVA_DEFAULT_LINKOPTS",
+)
+
+package(
+    default_visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "io",
+    srcs = ["io.cc"],
+    hdrs = [
+        "io.h",
+    ],
+    deps = [
+        "@asio",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
+    name = "transfer",
+    srcs = ["transfer.cc"],
+    hdrs = ["transfer.h"],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        ":io",
+        "//snova/log:log_api",
+    ],
+)

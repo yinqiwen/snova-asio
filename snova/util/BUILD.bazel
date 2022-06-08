@@ -1,0 +1,38 @@
+load(
+    "//snova:copts/configure_copts.bzl",
+    "SNOVA_DEFAULT_COPTS",
+    "SNOVA_DEFAULT_LINKOPTS",
+)
+
+package(
+    default_visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "net_helper",
+    srcs = [
+        "net_helper.cc",
+    ],
+    hdrs = [
+        "net_helper.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        "@asio",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "sni",
+    srcs = [
+        "sni.cc",
+    ],
+    hdrs = [
+        "sni.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        "//snova/log:log_api",
+    ],
+)

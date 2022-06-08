@@ -1,0 +1,19 @@
+load(
+    "//snova:copts/configure_copts.bzl",
+    "SNOVA_DEFAULT_COPTS",
+    "SNOVA_DEFAULT_LINKOPTS",
+)
+
+package(
+    default_visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "log_api",
+    hdrs = [
+        "log_macros.h",
+    ],
+    deps = [
+        "@com_github_spdlog//:spdlog",
+    ],
+)
