@@ -94,3 +94,14 @@ cc_library(
             "https://github.com/google/googletest/archive/release-{ver}.tar.gz".format(ver = gtest_ver),
         ],
     )
+
+    jemalloc_ver = kwargs.get("jemalloc_ver", "5.3.0")
+    jemalloc_name = "jemalloc-{ver}".format(ver = jemalloc_ver)
+    http_archive(
+        name = "com_github_jemalloc",
+        strip_prefix = jemalloc_name,
+        urls = [
+            "https://github.com/jemalloc/jemalloc/archive/refs/tags/{ver}.zip".format(ver = jemalloc_ver),
+        ],
+        build_file = clean_dep("//:bazel/jemalloc.BUILD"),
+    )

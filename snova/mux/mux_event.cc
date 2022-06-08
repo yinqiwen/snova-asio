@@ -27,37 +27,11 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/mux/mux_event.h"
-#include "absl/base/internal/endian.h"
-// #include "boost/endian/conversion.hpp"
+
 #include "snova/log/log_macros.h"
+#include "snova/util/endian.h"
 
 namespace snova {
-
-template <typename T>
-static T native_to_big(T v) {
-  if constexpr (std::is_same_v<uint64_t, T>) {
-    return absl::ghtonll(v);
-  } else if constexpr (std::is_same_v<uint32_t, T>) {
-    return absl::ghtonl(v);
-  } else if constexpr (std::is_same_v<uint16_t, T>) {
-    return absl::ghtons(v);
-  } else {
-    static_assert(sizeof(T) == std::size_t(-1), "Not support integer type.");
-  }
-}
-
-template <typename T>
-static T big_to_native(T v) {
-  if constexpr (std::is_same_v<uint64_t, T>) {
-    return absl::gntohll(v);
-  } else if constexpr (std::is_same_v<uint32_t, T>) {
-    return absl::gntohl(v);
-  } else if constexpr (std::is_same_v<uint16_t, T>) {
-    return absl::gntohs(v);
-  } else {
-    static_assert(sizeof(T) == std::size_t(-1), "Not support integer type.");
-  }
-}
 
 int MuxEventHead::Encode(MutableBytes& buffer) {
   if (buffer.size() < kEventHeadSize) {

@@ -27,8 +27,8 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/mux/cipher_context.h"
-#include <boost/endian/conversion.hpp>
 #include "snova/log/log_macros.h"
+#include "snova/util/endian.h"
 
 namespace snova {
 
@@ -119,7 +119,7 @@ int CipherContext::Encrypt(std::unique_ptr<MuxEvent>& in, MutableBytes& out) {
   if (0 != rc) {
     return rc;
   }
-  uint64_t iv = boost::endian::native_to_big(encrypt_iv_);
+  uint64_t iv = native_to_big(encrypt_iv_);
   unsigned char nonce[iv_len_];
   size_t olen = 0;
   memset(nonce, 0, iv_len_);
@@ -162,7 +162,7 @@ int CipherContext::Decrypt(const Bytes& in, std::unique_ptr<MuxEvent>& out, size
   if (MBEDTLS_CIPHER_NONE == cipher_type_) {
     head.Decode(in);
   } else {
-    uint64_t iv = boost::endian::native_to_big(decrypt_iv_);
+    uint64_t iv = native_to_big(decrypt_iv_);
     memset(nonce, 0, iv_len_);
     memcpy(nonce, &iv, sizeof(iv));
     size_t olen = 0;

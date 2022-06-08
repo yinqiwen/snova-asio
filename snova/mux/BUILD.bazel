@@ -59,6 +59,7 @@ cc_library(
         ":mux_event",
         "//snova/io",
         "//snova/log:log_api",
+        "//snova/util:endian",
         "@com_github_mbedtls//:mbedtls",
     ],
 )
@@ -87,7 +88,7 @@ cc_library(
     deps = [
         "//snova/io",
         "//snova/log:log_api",
-        "@com_google_absl//absl/base:endian",
+        "//snova/util:endian",
     ],
 )
 

@@ -36,3 +36,14 @@ cc_library(
         "//snova/log:log_api",
     ],
 )
+
+cc_library(
+    name = "endian",
+    hdrs = [
+        "endian.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        "@com_google_absl//absl/base:endian",
+    ],
+)
