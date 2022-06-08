@@ -44,7 +44,6 @@ cc_library(
         strip_prefix = asio_name,
         build_file_content = _ASIO_BUILD_FILE,
         urls = [
-            "https://mirrors.tencent.com/github.com/chriskohlhoff/asio/archive/refs/tags/asio-{ver}.tar.gz".format(ver = asio_ver),
             "https://github.com/chriskohlhoff/asio/archive/refs/tags/asio-{ver}.tar.gz".format(ver = asio_ver),
         ],
     )
@@ -55,7 +54,6 @@ cc_library(
         name = "com_google_absl",
         strip_prefix = abseil_name,
         urls = [
-            "https://mirrors.tencent.com/github.com/abseil/abseil-cpp/archive/{ver}.tar.gz".format(ver = abseil_ver),
             "https://github.com/abseil/abseil-cpp/archive/refs/tags/{ver}.tar.gz".format(ver = abseil_ver),
         ],
     )
@@ -66,7 +64,6 @@ cc_library(
         name = "com_github_spdlog",
         strip_prefix = spdlog_name,
         urls = [
-            "https://mirrors.tencent.com/github.com/gabime/spdlog/archive/v{ver}.tar.gz".format(ver = spdlog_ver),
             "https://github.com/gabime/spdlog/archive/v{ver}.tar.gz".format(ver = spdlog_ver),
         ],
         build_file = clean_dep("//:bazel/spdlog.BUILD"),
@@ -78,7 +75,6 @@ cc_library(
         name = "com_github_mbedtls",
         strip_prefix = mbedtls_name,
         urls = [
-            "https://mirrors.tencent.com/github.com/Mbed-TLS/mbedtls/archive/v{ver}.tar.gz".format(ver = mbedtls_ver),
             "https://github.com/Mbed-TLS/mbedtls/archive/v{ver}.tar.gz".format(ver = mbedtls_ver),
         ],
         build_file = clean_dep("//:bazel/mbedtls.BUILD"),
@@ -90,7 +86,6 @@ cc_library(
         name = "com_google_googletest",
         strip_prefix = gtest_name,
         urls = [
-            "https://mirrors.tencent.com/github.com/google/googletest/archive/release-{ver}.tar.gz".format(ver = gtest_ver),
             "https://github.com/google/googletest/archive/release-{ver}.tar.gz".format(ver = gtest_ver),
         ],
     )
@@ -113,7 +108,6 @@ cc_library(
         strip_prefix = mimalloc_name,
         build_file = clean_dep("//:bazel/mimalloc.BUILD"),
         urls = [
-            "https://mirrors.tencent.com/github.com/microsoft/mimalloc/archive/v{ver}.tar.gz".format(ver = mimalloc_ver),
             "https://github.com/microsoft/mimalloc/archive/v{ver}.tar.gz".format(ver = mimalloc_ver),
         ],
     )

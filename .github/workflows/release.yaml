@@ -1,6 +1,6 @@
 on:
   push:
-    branches:
+    tags:
       - main
   pull_request:
     types: [ assigned, opened, synchronize, reopened, labeled ]
@@ -19,21 +19,10 @@ jobs:
             CC: gcc-11
             CXX: g++-11
       - run: tar czf snova_asio_linux_amd64.tar.gz -C ./bazel-bin/snova/app/ snova-local snova-remote
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: snova_asio_linux_amd64.tar.gz
   windows_build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
       - uses: bazelbuild/setup-bazelisk@v2
       - run: bazel.exe build --cxxopt=/std:c++20 //...
-      - run: tar czf snova_asio_windows_amd64.tar.gz -C ./bazel-bin/snova/app/ snova-local.exe snova-remote.exe
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: snova_asio_windows_amd64.tar.gz 
   
