@@ -1,0 +1,115 @@
+/*
+ *Copyright (c) 2022, qiyingwang <qiyingwang@tencent.com>
+ *All rights reserved.
+ *
+ *Redistribution and use in source and binary forms, with or without
+ *modification, are permitted provided that the following conditions are met:
+ *
+ *  * Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *  * Neither the name of rimos nor the names of its contributors may be used
+ *    to endorse or promote products derived from this software without
+ *    specific prior written permission.
+ *
+ *THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ *AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ *IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ *ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
+ *BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ *CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ *SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ *INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ *CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ *THE POSSIBILITY OF SUCH DAMAGE.
+ */
+#include "snova/server/local_server.h"
+#include <string_view>
+#include <system_error>
+
+#include "absl/strings/str_split.h"
+#include "asio/experimental/as_tuple.hpp"
+#include "snova/log/log_macros.h"
+#include "snova/util/net_helper.h"
+
+namespace snova {
+static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
+  IOBufPtr buffer = get_iobuf(kMaxChunkSize);
+  auto [ec, n] =
+      co_await sock.async_read_some(::asio::buffer(buffer->data(), buffer->size()),
+                                    ::asio::experimental::as_tuple(::asio::use_awaitable));
+  if (ec) {
+    co_return;
+  }
+  if (0 == n) {
+    co_return;
+  }
+  if (n < 3) {
+    SNOVA_ERROR("no enought data received.");
+    co_return;
+  }
+  Bytes readable(buffer->data(), n);
+  if ((*buffer)[0] == 5) {  // socks5
+    co_await handle_socks5_connection(std::move(sock), std::move(buffer), readable);
+  } else if ((*buffer)[0] == 4) {  // socks4
+    SNOVA_ERROR("Socks4 not supported!");
+    co_return;
+  } else if ((*buffer)[0] == 0x16) {  // tls
+    auto tls_major_ver = (*buffer)[1];
+    if (tls_major_ver < 3) {
+      // no SNI before sslv3
+      SNOVA_ERROR("sslv2/sslv1 not supported!");
+      co_return;
+    }
+    co_await handle_tls_connection(std::move(sock), std::move(buffer), readable);
+  } else {  // http
+    co_await handle_http_connection(std::move(sock), std::move(buffer), readable);
+  }
+  co_return;
+}
+
+static ::asio::awaitable<void> server_loop(::asio::ip::tcp::acceptor server) {
+  while (true) {
+    auto [ec, client] =
+        co_await server.async_accept(::asio::experimental::as_tuple(::asio::use_awaitable));
+    if (ec) {
+      SNOVA_ERROR("Failed to accept with error:{}", ec.message());
+      co_return;
+    }
+    SNOVA_INFO("Receive new local connection.");
+    auto ex = co_await asio::this_coro::executor;
+    ::asio::co_spawn(ex, handle_conn(std::move(client)), ::asio::detached);
+  }
+  co_return;
+}
+
+asio::awaitable<std::error_code> start_local_server(const std::string& addr) {
+  PaserEndpointResult parse_result = parse_endpoint(addr);
+  if (parse_result.second) {
+    co_return parse_result.second;
+  }
+
+  auto ex = co_await asio::this_coro::executor;
+  ::asio::ip::tcp::endpoint& endpoint = *parse_result.first;
+  ::asio::ip::tcp::acceptor acceptor(ex);
+  acceptor.open(endpoint.protocol());
+  acceptor.set_option(::asio::socket_base::reuse_address(true));
+  std::error_code ec;
+  acceptor.bind(endpoint, ec);
+  if (ec) {
+    SNOVA_ERROR("Failed to bind {} with error:{}", addr, ec.message());
+    co_return ec;
+  }
+  acceptor.listen(::asio::socket_base::max_listen_connections, ec);
+  if (ec) {
+    SNOVA_ERROR("Failed to listen {} with error:{}", addr, ec.message());
+    co_return ec;
+  }
+  SNOVA_INFO("Start listen on address:{}.", addr);
+  ::asio::co_spawn(ex, server_loop(std::move(acceptor)), ::asio::detached);
+  co_return ec;
+}
+}  // namespace snova
