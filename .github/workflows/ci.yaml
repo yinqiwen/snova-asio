@@ -10,4 +10,5 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: bazelbuild/setup-bazelisk@v2
-      - run: bazel build --cxxopt=-std=c++20  ...
+      - run: bazel build --cxxopt=-std=c++2a --cxxopt=-fcoroutines //snova/app:snova-local
+      - run: bazel build --cxxopt=-std=c++2a --cxxopt=-fcoroutines //snova/app:snova-remote
