@@ -16,6 +16,7 @@ cc_binary(
     copts = SNOVA_DEFAULT_COPTS,
     linkopts = SNOVA_DEFAULT_LINKOPTS,
     linkstatic = 1,
+    malloc = "@com_github_jemalloc//:jemalloc",
     deps = [
         "//snova/log:log_api",
         "//snova/mux:mux_client",
@@ -33,6 +34,7 @@ cc_binary(
     copts = SNOVA_DEFAULT_COPTS,
     linkopts = SNOVA_DEFAULT_LINKOPTS,
     linkstatic = 1,
+    malloc = "@com_github_jemalloc//:jemalloc",
     deps = [
         "//snova/log:log_api",
         "//snova/server:remote_server",
