@@ -19,9 +19,9 @@ cmake(
     out_lib_dir = "lib",
     out_static_libs = select({
         "@bazel_tools//src/conditions:windows": [
-            "libmbedtls.lib",
-            "libmbedcrypto.lib",
-            "libmbedx509.lib",
+            "mbedtls.lib",
+            "mbedcrypto.lib",
+            "mbedx509.lib",
         ],
         "//conditions:default": [
             "libmbedtls.a",
