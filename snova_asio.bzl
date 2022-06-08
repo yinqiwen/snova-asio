@@ -101,7 +101,7 @@ cc_library(
         name = "com_github_jemalloc",
         strip_prefix = jemalloc_name,
         urls = [
-            "https://github.com/jemalloc/jemalloc/archive/refs/tags/{ver}.zip".format(ver = jemalloc_ver),
+            "https://github.com/jemalloc/jemalloc/releases/download/{ver}/jemalloc-{ver}.tar.bz2".format(ver = jemalloc_ver),
         ],
         build_file = clean_dep("//:bazel/jemalloc.BUILD"),
     )

@@ -10,8 +10,8 @@ filegroup(
 
 configure_make(
     name = "jemalloc_build",
-    args = ["-j 6"],
-    autogen = True,
+    # args = ["-j 6"],
+    # autogen = True,
     configure_in_place = True,
     configure_options = [
         # "--enable-prof",
