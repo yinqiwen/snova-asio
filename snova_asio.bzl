@@ -105,3 +105,15 @@ cc_library(
         ],
         build_file = clean_dep("//:bazel/jemalloc.BUILD"),
     )
+
+    mimalloc_ver = kwargs.get("mimalloc_ver", "2.0.6")
+    mimalloc_name = "mimalloc-{ver}".format(ver = mimalloc_ver)
+    http_archive(
+        name = "com_github_microsoft_mimalloc",
+        strip_prefix = mimalloc_name,
+        build_file = clean_dep("//:bazel/mimalloc.BUILD"),
+        urls = [
+            "https://mirrors.tencent.com/github.com/microsoft/mimalloc/archive/v{ver}.tar.gz".format(ver = mimalloc_ver),
+            "https://github.com/microsoft/mimalloc/archive/v{ver}.tar.gz".format(ver = mimalloc_ver),
+        ],
+    )
