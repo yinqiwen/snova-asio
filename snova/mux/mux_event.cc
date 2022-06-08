@@ -27,7 +27,7 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/mux/mux_event.h"
-#include <boost/endian/conversion.hpp>
+#include "boost/endian/conversion.hpp"
 #include "snova/log/log_macros.h"
 
 namespace snova {

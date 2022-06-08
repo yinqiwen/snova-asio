@@ -87,6 +87,7 @@ cc_library(
     deps = [
         "//snova/io",
         "//snova/log:log_api",
+        "@com_github_boost_endian//:endian",
     ],
 )
 
