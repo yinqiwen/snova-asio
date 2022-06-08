@@ -1,12 +1,12 @@
 SNOVA_DEFAULT_COPTS = select({
     "@bazel_tools//src/conditions:windows": [
-        "/std:c++20",
+        # "/std:c++20",
         "/O2",
     ],
     "//conditions:default": [
-        "-std=c++20",
+        # "-std=c++20",
         "-Werror=return-type",
-        "-fcoroutines",
+        # "-fcoroutines",
         # "-DASIO_HAS_IO_URING",
         # "-DASIO_DISABLE_EPOLL",
         "-O2",
