@@ -16,10 +16,11 @@ cc_binary(
     copts = SNOVA_DEFAULT_COPTS,
     linkopts = SNOVA_DEFAULT_LINKOPTS,
     linkstatic = 1,
-    malloc = select({
-        "@bazel_tools//src/conditions:windows": "@bazel_tools//tools/cpp:malloc",
-        "//conditions:default": "@com_github_jemalloc//:jemalloc",
-    }),
+    # malloc = select({
+    #     "@bazel_tools//src/conditions:windows": "@bazel_tools//tools/cpp:malloc",
+    #     "//conditions:default": "@com_github_jemalloc//:jemalloc",
+    # }),
+    malloc = "@com_github_microsoft_mimalloc//:libmimalloc",
     deps = [
         "//snova/log:log_api",
         "//snova/mux:mux_client",
@@ -37,10 +38,7 @@ cc_binary(
     copts = SNOVA_DEFAULT_COPTS,
     linkopts = SNOVA_DEFAULT_LINKOPTS,
     linkstatic = 1,
-    malloc = select({
-        "@bazel_tools//src/conditions:windows": "@bazel_tools//tools/cpp:malloc",
-        "//conditions:default": "@com_github_jemalloc//:jemalloc",
-    }),
+    malloc = "@com_github_microsoft_mimalloc//:libmimalloc",
     deps = [
         "//snova/log:log_api",
         "//snova/server:remote_server",

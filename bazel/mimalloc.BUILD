@@ -1,64 +1,63 @@
-load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
+package(default_visibility = ["//visibility:public"])
 
-filegroup(
-    name = "all_srcs",
-    srcs = glob(["**"]),
+MIMALLOC_COPTS = select({
+    "@bazel_tools//src/conditions:windows": [
+        "/O2 /Zc:__cplusplus /DMI_MALLOC_OVERRIDE /DDMI_STATIC_LIB",
+    ],
+    "//conditions:default": [
+        "-O2",
+        "-Wall -Wextra -Wno-unknown-pragmas",
+        "-fvisibility=hidden",
+        "-ftls-model=initial-exec",
+        "-fno-builtin-malloc",
+        "-DMI_MALLOC_OVERRIDE",
+        "-DMI_STATIC_LIB",
+    ],
+}) + select({
+    "@bazel_tools//src/conditions:darwin": [
+        "-DMI_OSX_ZONE=1 -DMI_OSX_INTERPOSE=1",
+    ],
+    "//conditions:default": [
+    ],
+})
+
+cc_library(
+    name = "mimalloc_headers",
+    hdrs = glob([
+        "include/*.h",
+    ]),
+    strip_include_prefix = "include",
 )
 
-cmake(
-    name = "mimalloc",
-    generate_args = [
-        "-DCMAKE_BUILD_TYPE=Release",
-        "-DMI_BUILD_SHARED=OFF",
-        "-DMI_BUILD_TESTS=OFF",
-    ],
-    lib_source = ":all_srcs",
-    out_binaries = select({
-        "@bazel_tools//src/conditions:windows": ["../lib/mimalloc-2.0/mimalloc.obj"],
-        "//conditions:default": ["../lib64/mimalloc-2.0/mimalloc.o"],
-    }),
-    out_lib_dir = select({
-        "@bazel_tools//src/conditions:windows": "lib",
-        "//conditions:default": "lib64",
-    }),
-    out_static_libs = select({
-        "@bazel_tools//src/conditions:windows": [
-            "mimalloc-2.0/mimalloc-static.lib",
+cc_library(
+    name = "libmimalloc",
+    srcs = [
+        "src/alloc.c",
+        "src/alloc-aligned.c",
+        "src/alloc-posix.c",
+        "src/arena.c",
+        "src/bitmap.c",
+        "src/heap.c",
+        "src/init.c",
+        "src/options.c",
+        "src/os.c",
+        "src/page.c",
+        "src/random.c",
+        "src/segment.c",
+        "src/segment-cache.c",
+        "src/stats.c",
+    ] + select({
+        "@bazel_tools//src/conditions:darwin": [
+            "src/alloc-override-osx.c",
         ],
         "//conditions:default": [
-            "mimalloc-2.0/libmimalloc.a",
         ],
     }),
-    visibility = ["//visibility:public"],
+    hdrs = [
+        "src/alloc-override.c",
+        "src/bitmap.h",
+        "src/page-queue.c",
+    ],
+    copts = MIMALLOC_COPTS,
+    deps = [":mimalloc_headers"],
 )
-
-# genrule(
-#     name = "gen_mimalloc_override",
-#     srcs = [
-#         ":mimalloc",
-#     ],
-#     outs = ["mimalloc_override.lib"],
-#     cmd = " \n ".join([
-#         "for filename in $(locations @com_github_microsoft_mimalloc//:mimalloc);do",
-#         "if [[ $$filename == *'mimalloc.o' || $$filename == *'mimalloc.obj' ]]; then",
-#         "ar -crs $@ $$filename ",
-#         "fi",
-#         "done",
-#     ]),
-#     visibility = ["//visibility:public"],
-# )
-
-# cc_import(
-#     name = "mimalloc_override_import",
-#     static_library = ":gen_mimalloc_override",
-#     visibility = ["//visibility:public"],
-#     alwayslink = 1,
-# )
-
-# cc_library(
-#     name = "mimalloc_override",
-#     visibility = ["//visibility:public"],
-#     deps = [
-#         ":mimalloc_override_import",
-#     ],
-# )
