@@ -24,8 +24,11 @@ cc_binary(
         "//snova/log:log_api",
         "//snova/mux:mux_client",
         "//snova/server:local_server",
+        "@com_google_absl//absl/flags:config",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/flags:parse",
+        "@com_google_absl//absl/flags:usage",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -44,8 +47,11 @@ cc_binary(
     deps = [
         "//snova/log:log_api",
         "//snova/server:remote_server",
+        "@com_google_absl//absl/flags:config",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/flags:parse",
+        "@com_google_absl//absl/flags:usage",
+        "@com_google_absl//absl/strings",
     ],
 )
 

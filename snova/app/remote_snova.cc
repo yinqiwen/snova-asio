@@ -30,12 +30,23 @@
 #include <vector>
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
+#include "absl/flags/usage.h"
+#include "absl/flags/usage_config.h"
 #include "snova/log/log_macros.h"
 #include "snova/server/remote_server.h"
 ABSL_FLAG(std::string, listen, "127.0.0.1:48101", "Listen address");
 ABSL_FLAG(std::string, cipher_method, "chacha20_poly1305", "Cipher method");
 ABSL_FLAG(std::string, cipher_key, "default cipher key", "Cipher key");
 int main(int argc, char** argv) {
+  absl::SetProgramUsageMessage("remote server for private proxy tools");
+  absl::FlagsUsageConfig usage_config;
+  usage_config.contains_help_flags = [](absl::string_view path) -> bool {
+    if (absl::StartsWith(path, "snova/")) {
+      return true;
+    }
+    return false;
+  };
+  usage_config.version_string = []() -> std::string { return "v0.0.1"; };
   absl::ParseCommandLine(argc, argv);
   ::asio::io_context ctx;
   std::string listen = absl::GetFlag(FLAGS_listen);
