@@ -104,6 +104,7 @@ asio::awaitable<std::error_code> MuxClient::Init(const std::string& user,
   }
   auto ex = co_await asio::this_coro::executor;
   ::asio::co_spawn(ex, CheckConnections(), ::asio::detached);
+  co_return std::error_code{};
 }
 asio::awaitable<void> MuxClient::CheckConnections() {
   auto ex = co_await asio::this_coro::executor;
