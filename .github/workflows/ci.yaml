@@ -41,4 +41,16 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: snova_asio_windows_amd64.tar.gz 
+  macos_build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: bazelbuild/setup-bazelisk@v2
+      - run: bazel build --cxxopt=/std:c++20 --cxxopt=-stdlib=libc++ //...
+      - run: tar czf snova_asio_darwin_amd64.tar.gz -C ./bazel-bin/snova/app/ snova-local snova-remote
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: snova_asio_darwin_amd64.tar.gz 
   

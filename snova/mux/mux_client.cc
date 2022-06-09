@@ -118,6 +118,7 @@ asio::awaitable<void> MuxClient::CheckConnections() {
       }
     }
   }
+  co_return;
 }
 
 MuxConnectionPtr MuxClient::SelectConnection() {
