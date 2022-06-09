@@ -24,6 +24,7 @@ cc_binary(
         "//snova/log:log_api",
         "//snova/mux:mux_client",
         "//snova/server:local_server",
+        "//snova/util:misc_helper",
         "@com_google_absl//absl/flags:config",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/flags:parse",
@@ -68,3 +69,12 @@ cc_binary(
 #         "@com_github_mbedtls//:mbedtls",
 #     ],
 # )
+
+cc_binary(
+    name = "test",
+    srcs = [
+        "test.cc",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    linkopts = SNOVA_DEFAULT_LINKOPTS,
+)

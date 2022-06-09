@@ -111,3 +111,9 @@ cc_library(
             "https://github.com/microsoft/mimalloc/archive/v{ver}.tar.gz".format(ver = mimalloc_ver),
         ],
     )
+
+    native.new_local_repository(
+        name = "gcc_arm_linux_gnueabihf",
+        path = "/usr",
+        build_file = clean_dep("//:toolchains/gcc_arm_linux_gnueabihf.BUILD"),
+    )

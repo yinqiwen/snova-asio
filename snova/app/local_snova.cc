@@ -27,17 +27,19 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <limits>
+#include <random>
 #include <string>
 #include <vector>
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
 #include "absl/flags/usage.h"
 #include "absl/flags/usage_config.h"
-#include "absl/random/random.h"
+// #include "absl/random/random.h"
 #include "absl/strings/match.h"
 #include "snova/log/log_macros.h"
 #include "snova/mux/mux_client.h"
 #include "snova/server/local_server.h"
+#include "snova/util/misc_helper.h"
 ABSL_FLAG(std::string, listen, "127.0.0.1:48100", "Listen address");
 ABSL_FLAG(std::string, remote, "", "Remote server address");
 ABSL_FLAG(std::string, cipher_method, "chacha20_poly1305", "Cipher method");
@@ -61,9 +63,11 @@ int main(int argc, char** argv) {
   std::string cipher_method = absl::GetFlag(FLAGS_cipher_method);
   std::string cipher_key = absl::GetFlag(FLAGS_cipher_key);
 
-  absl::BitGen bitgen;
-  uint64_t client_id = absl::Uniform<uint64_t>(bitgen, 0, std::numeric_limits<uint64_t>::max());
+  uint64_t client_id = snova::random_uint64(0, std::numeric_limits<uint64_t>::max());
+  // absl::BitGen bitgen;
+  // uint64_t client_id = absl::Uniform<uint64_t>(bitgen, 0, std::numeric_limits<uint64_t>::max());
   snova::MuxClient::GetInstance()->SetClientId(client_id);
+  SNOVA_INFO("Generated client_id:{}", client_id);
   ::asio::io_context ctx;
   ::asio::co_spawn(
       ctx,

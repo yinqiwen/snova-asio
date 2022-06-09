@@ -3,66 +3,67 @@ package(default_visibility = ["//visibility:public"])
 filegroup(
     name = "all",
     srcs = glob(["**/**"]),
+    # srcs = [],
 )
 
 filegroup(
     name = "ar",
-    srcs = glob(["bin/*-ar"]),
+    srcs = glob(["bin/arm-none-linux-gnueabihf-ar"]),
 )
 
 filegroup(
     name = "as",
-    srcs = glob(["bin/*-as"]),
+    srcs = glob(["bin/arm-none-linux-gnueabihf-as"]),
 )
 
 filegroup(
     name = "cpp",
-    srcs = glob(["bin/*-cpp"]),
+    srcs = glob(["bin/arm-none-linux-gnueabihf-cpp"]),
 )
 
 filegroup(
     name = "dwp",
-    srcs = glob(["bin/*-dwp"]),
+    srcs = glob(["bin/arm-none-linux-gnueabihf-dwp"]),
 )
 
 filegroup(
     name = "gcc",
-    srcs = glob(["bin/*-gcc"]),
+    srcs = glob(["bin/arm-none-linux-gnueabihf-gcc"]),
 )
 
 filegroup(
     name = "g++",
-    srcs = glob(["bin/*-g++"]),
+    srcs = glob(["bin/arm-none-linux-gnueabihf-g++"]),
 )
 
 filegroup(
     name = "gcov",
-    srcs = glob(["bin/*-gcov"]),
+    srcs = glob(["bin/arm-none-linux-gnueabihf-gcov"]),
 )
 
 filegroup(
     name = "ld",
-    srcs = glob(["bin/*-ld"]),
+    srcs = glob(["bin/arm-none-linux-gnueabihf-ld"]),
 )
 
 filegroup(
     name = "nm",
-    srcs = glob(["bin/*-nm"]),
+    srcs = glob(["bin/arm-none-linux-gnueabihf-nm"]),
 )
 
 filegroup(
     name = "objcopy",
-    srcs = glob(["bin/*-objcopy"]),
+    srcs = glob(["bin/arm-none-linux-gnueabihf-objcopy"]),
 )
 
 filegroup(
     name = "objdump",
-    srcs = glob(["bin/*-objdump"]),
+    srcs = glob(["bin/arm-none-linux-gnueabihf-objdump"]),
 )
 
 filegroup(
     name = "strip",
-    srcs = glob(["bin/*-strip"]),
+    srcs = glob(["bin/arm-none-linux-gnueabihf-strip"]),
 )
 
 filegroup(
@@ -91,8 +92,8 @@ cc_toolchain_config(
     abi_version = "eabi",
     c_version = "c99",
     compile_flags = [
-        "-mthumb",
-        "-mcpu=cortex-a9",
+        # "-mthumb",
+        # "-mcpu=cortex-a9",
     ],
     compiler = "gcc",
     cpp_version = "c++2a",
@@ -101,11 +102,11 @@ cc_toolchain_config(
     ],
     dbg_compile_flags = [],
     link_flags = [
-        "--specs=rdimon.specs",
-        "-lrdimon",
-        "-mcpu=cortex-a9",
+        # "--specs=rdimon.specs",
+        # "-lrdimon",
+        # "-mcpu=cortex-a9",
         #"-march=armv7-a",
-        "-mthumb",
+        # "-mthumb",
     ],
     link_libs = [],
     opt_compile_flags = [],

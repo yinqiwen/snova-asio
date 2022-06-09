@@ -27,8 +27,9 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/mux/mux_connection.h"
-#include "absl/random/random.h"
+// #include "absl/random/random.h"
 #include "asio/experimental/as_tuple.hpp"
+#include "snova/util/misc_helper.h"
 #include "spdlog/fmt/bundled/ostream.h"
 
 namespace snova {
@@ -60,8 +61,9 @@ asio::awaitable<ServerAuthResult> MuxConnection::ServerAuth() {
     SNOVA_ERROR("Recv non auth reqeust with type:{}", auth_req->head.type);
     co_return ServerAuthResult{0, false};
   }
-  absl::BitGen bitgen;
-  uint64_t iv = absl::Uniform(bitgen, 0, 102 * 1024 * 1024LL);
+  uint64_t iv = random_uint64(0, 102 * 1024 * 1024LL);
+  // absl::BitGen bitgen;
+  // uint64_t iv = absl::Uniform(bitgen, 0, 102 * 1024 * 1024LL);
   std::unique_ptr<AuthResponse> auth_res = std::make_unique<AuthResponse>();
   auth_res->success = true;
   auth_res->iv = iv;

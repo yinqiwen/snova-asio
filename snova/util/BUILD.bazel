@@ -61,3 +61,14 @@ cc_library(
         "@com_google_absl//absl/strings",
     ],
 )
+
+cc_library(
+    name = "misc_helper",
+    srcs = [
+        "misc_helper.cc",
+    ],
+    hdrs = [
+        "misc_helper.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+)
