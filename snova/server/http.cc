@@ -35,6 +35,7 @@
 #include "snova/log/log_macros.h"
 #include "snova/server/local_relay.h"
 #include "snova/server/local_server.h"
+#include "snova/util/http_helper.h"
 #include "spdlog/fmt/bundled/ostream.h"
 
 namespace snova {
@@ -45,6 +46,7 @@ asio::awaitable<void> handle_http_connection(::asio::ip::tcp::socket&& s, IOBufP
   ::asio::ip::tcp::socket sock(std::move(s));  //  make rvalue sock not release after co_await
   IOBufPtr conn_read_buffer = std::move(rbuf);
   IOBuf& read_buffer = *conn_read_buffer;
+  absl::string_view all_data((const char*)(readable_data.data()), readable_data.size());
   std::string_view cmd((const char*)(readable_data.data()), 3);
   bool is_http = false;
   if (absl::EqualsIgnoreCase(cmd, "GET") || absl::EqualsIgnoreCase(cmd, "CON") ||
@@ -139,7 +141,11 @@ asio::awaitable<void> handle_http_connection(::asio::ip::tcp::socket&& s, IOBufP
       co_return;
     }
   }
-  SNOVA_INFO("host:{}, port:{}, path_view:{}", host_view, port, path_view);
+  absl::string_view kk;
+
+  int rcc = parse_http_hostport(all_data, kk);
+
+  SNOVA_INFO("host:{}, port:{}, path_view:{}, {}/{}", host_view, port, path_view, rcc, kk);
   if (absl::EqualsIgnoreCase(method, "CONNECT")) {
     if (port == 0) {
       port = 443;

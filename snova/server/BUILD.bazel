@@ -25,6 +25,7 @@ cc_library(
         "//snova/io",
         "//snova/log:log_api",
         "//snova/mux:mux_client",
+        "//snova/util:http_helper",
         "//snova/util:net_helper",
         "//snova/util:sni",
         "@asio",
