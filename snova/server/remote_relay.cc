@@ -27,11 +27,16 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/server/remote_relay.h"
+#include "absl/flags/declare.h"
+#include "absl/flags/flag.h"
 #include "asio/experimental/awaitable_operators.hpp"
 #include "snova/io/transfer.h"
 #include "snova/mux/mux_server.h"
 #include "snova/mux/mux_stream.h"
+#include "snova/server/local_relay.h"
 #include "spdlog/fmt/bundled/ostream.h"
+
+ABSL_DECLARE_FLAG(bool, middle);
 
 namespace snova {
 using namespace asio::experimental::awaitable_operators;
@@ -43,39 +48,42 @@ asio::awaitable<void> server_relay(uint64_t client_id, std::unique_ptr<MuxEvent>
     SNOVA_ERROR("null request for EVENT_STREAM_OPEN");
     co_return;
   }
-
   auto ex = co_await asio::this_coro::executor;
   EventWriterFactory factory = MuxServer::GetInstance()->GetEventWriterFactory(client_id);
-  MuxStreamPtr stream = MuxStream::New(std::move(factory), ex, open_request->head.sid);
-  asio::ip::tcp::resolver r(ex);
-  std::string port_str = std::to_string(open_request->remote_port);
-  // SNOVA_INFO("1.5[{}]server_relay {}", open_request->head.sid, client_id);
-  auto [ec, results] = co_await r.async_resolve(
-      open_request->remote_host, port_str, ::asio::experimental::as_tuple(::asio::use_awaitable));
-  if (ec || results.size() == 0) {
-    SNOVA_ERROR("No endpoint found for {}:{} with error:{}", open_request->remote_host, port_str,
-                ec);
-    co_await stream->Close(false);
-    co_return;
-  }
-  // SNOVA_INFO("2[{}]server_relay {}", mux_event->head.sid, client_id);
+  MuxStreamPtr local_stream = MuxStream::New(std::move(factory), ex, open_request->head.sid);
 
-  ::asio::ip::tcp::socket socket(ex);
-  ::asio::ip::tcp::endpoint select_endpoint = *(results.begin());
-  SNOVA_INFO("[{}]Relay to {}/{}", open_request->head.sid, open_request->remote_host,
-             select_endpoint);
-  auto [connect_ec] = co_await socket.async_connect(
-      select_endpoint, ::asio::experimental::as_tuple(::asio::use_awaitable));
-  if (connect_ec) {
-    SNOVA_ERROR("Connect {} with error:{}", select_endpoint, connect_ec);
-    co_await stream->Close(false);
-    co_return;
+  if (absl::GetFlag(FLAGS_middle)) {
+    co_await client_relay(local_stream, Bytes{}, open_request->remote_host,
+                          open_request->remote_port, open_request->is_tcp);
+  } else {
+    asio::ip::tcp::resolver r(ex);
+    std::string port_str = std::to_string(open_request->remote_port);
+    // SNOVA_INFO("1.5[{}]server_relay {}", open_request->head.sid, client_id);
+    auto [ec, results] = co_await r.async_resolve(
+        open_request->remote_host, port_str, ::asio::experimental::as_tuple(::asio::use_awaitable));
+    if (ec || results.size() == 0) {
+      SNOVA_ERROR("No endpoint found for {}:{} with error:{}", open_request->remote_host, port_str,
+                  ec);
+      co_await local_stream->Close(false);
+      co_return;
+    }
+    ::asio::ip::tcp::socket socket(ex);
+    ::asio::ip::tcp::endpoint select_endpoint = *(results.begin());
+    SNOVA_INFO("[{}]Relay to {}/{}", open_request->head.sid, open_request->remote_host,
+               select_endpoint);
+    auto [connect_ec] = co_await socket.async_connect(
+        select_endpoint, ::asio::experimental::as_tuple(::asio::use_awaitable));
+    if (connect_ec) {
+      SNOVA_ERROR("Connect {} with error:{}", select_endpoint, connect_ec);
+      co_await local_stream->Close(false);
+      co_return;
+    }
+    try {
+      co_await(transfer(socket, local_stream) && transfer(local_stream, socket));
+    } catch (std::exception& ex) {
+      SNOVA_ERROR("ex:{}", ex.what());
+    }
+    co_await local_stream->Close(false);
   }
-  try {
-    co_await(transfer_socket(socket, stream) && transfer_stream(stream, socket));
-  } catch (std::exception& ex) {
-    SNOVA_ERROR("ex:{}", ex.what());
-  }
-  co_await stream->Close(false);
 }
 }  // namespace snova

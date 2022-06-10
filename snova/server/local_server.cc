@@ -30,13 +30,28 @@
 #include <string_view>
 #include <system_error>
 
+#include "absl/flags/declare.h"
+#include "absl/flags/flag.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_split.h"
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/log/log_macros.h"
 #include "snova/util/net_helper.h"
 
+ABSL_DECLARE_FLAG(bool, entry);
+ABSL_DECLARE_FLAG(bool, redirect);
 namespace snova {
 static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
+  std::unique_ptr<::asio::ip::tcp::endpoint> remote_endpoint;
+  bool is_entry_node = absl::GetFlag(FLAGS_entry);
+  bool is_redirect_role = absl::GetFlag(FLAGS_redirect);
+  if (is_entry_node && is_redirect_role) {
+    remote_endpoint = std::make_unique<::asio::ip::tcp::endpoint>();
+    if (0 != get_orig_dst(sock.native_handle(), *remote_endpoint)) {
+      remote_endpoint.release();
+    }
+  }
+
   IOBufPtr buffer = get_iobuf(kMaxChunkSize);
   auto [ec, n] =
       co_await sock.async_read_some(::asio::buffer(buffer->data(), buffer->size()),
@@ -52,9 +67,10 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
     co_return;
   }
   Bytes readable(buffer->data(), n);
-  if ((*buffer)[0] == 5) {  // socks5
+  absl::string_view cmd3((const char*)(readable.data()), 3);
+  if (!is_redirect_role && (*buffer)[0] == 5) {  // socks5
     co_await handle_socks5_connection(std::move(sock), std::move(buffer), readable);
-  } else if ((*buffer)[0] == 4) {  // socks4
+  } else if (!is_redirect_role && (*buffer)[0] == 4) {  // socks4
     SNOVA_ERROR("Socks4 not supported!");
     co_return;
   } else if ((*buffer)[0] == 0x16) {  // tls
@@ -65,8 +81,13 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
       co_return;
     }
     co_await handle_tls_connection(std::move(sock), std::move(buffer), readable);
-  } else {  // http
+  } else if (absl::EqualsIgnoreCase(cmd3, "GET") || absl::EqualsIgnoreCase(cmd3, "CON") ||
+             absl::EqualsIgnoreCase(cmd3, "PUT") || absl::EqualsIgnoreCase(cmd3, "POS") ||
+             absl::EqualsIgnoreCase(cmd3, "DEL") || absl::EqualsIgnoreCase(cmd3, "OPT") ||
+             absl::EqualsIgnoreCase(cmd3, "TRA") || absl::EqualsIgnoreCase(cmd3, "PAT") ||
+             absl::EqualsIgnoreCase(cmd3, "HEA") || absl::EqualsIgnoreCase(cmd3, "UPG")) {
     co_await handle_http_connection(std::move(sock), std::move(buffer), readable);
+  } else {  // other
   }
   co_return;
 }

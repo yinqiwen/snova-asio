@@ -32,7 +32,8 @@
 #include "snova/io/io.h"
 
 namespace snova {
-asio::awaitable<void> transfer_stream(StreamPtr from, ::asio::ip::tcp::socket& to);
-asio::awaitable<void> transfer_socket(::asio::ip::tcp::socket& from, StreamPtr to);
+asio::awaitable<void> transfer(StreamPtr from, StreamPtr to);
+asio::awaitable<void> transfer(StreamPtr from, ::asio::ip::tcp::socket& to);
+asio::awaitable<void> transfer(::asio::ip::tcp::socket& from, StreamPtr to);
 
 }  // namespace snova

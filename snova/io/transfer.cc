@@ -33,7 +33,26 @@
 #include "spdlog/fmt/bundled/ostream.h"
 namespace snova {
 using namespace asio::experimental::awaitable_operators;
-asio::awaitable<void> transfer_stream(StreamPtr from, ::asio::ip::tcp::socket& to) {
+
+asio::awaitable<void> transfer(StreamPtr from, StreamPtr to) {
+  while (true) {
+    auto [data, len, ec] = co_await from->Read();
+    if (ec) {
+      // co_await from->Close(false);
+      SNOVA_ERROR("Read ERROR {} {}", len, ec);
+      break;
+    }
+    auto wec = co_await to->Write(std::move(data), len);
+    if (wec) {
+      // co_await from->Close(false);
+      SNOVA_ERROR("async_write ERROR {} ", wec);
+      break;
+    }
+  }
+  co_return;
+}
+
+asio::awaitable<void> transfer(StreamPtr from, ::asio::ip::tcp::socket& to) {
   while (true) {
     auto [data, len, ec] = co_await from->Read();
     if (ec) {
@@ -53,7 +72,7 @@ asio::awaitable<void> transfer_stream(StreamPtr from, ::asio::ip::tcp::socket& t
   }
   co_return;
 }
-asio::awaitable<void> transfer_socket(::asio::ip::tcp::socket& from, StreamPtr to) {
+asio::awaitable<void> transfer(::asio::ip::tcp::socket& from, StreamPtr to) {
   while (true) {
     IOBufPtr buf = get_iobuf(kMaxChunkSize);
     auto [ec, n] =

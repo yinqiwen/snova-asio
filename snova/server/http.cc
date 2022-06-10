@@ -47,21 +47,8 @@ asio::awaitable<void> handle_http_connection(::asio::ip::tcp::socket&& s, IOBufP
   IOBufPtr conn_read_buffer = std::move(rbuf);
   IOBuf& read_buffer = *conn_read_buffer;
   absl::string_view all_data((const char*)(readable_data.data()), readable_data.size());
-  std::string_view cmd((const char*)(readable_data.data()), 3);
-  bool is_http = false;
-  if (absl::EqualsIgnoreCase(cmd, "GET") || absl::EqualsIgnoreCase(cmd, "CON") ||
-      absl::EqualsIgnoreCase(cmd, "PUT") || absl::EqualsIgnoreCase(cmd, "POS") ||
-      absl::EqualsIgnoreCase(cmd, "DEL") || absl::EqualsIgnoreCase(cmd, "OPT") ||
-      absl::EqualsIgnoreCase(cmd, "TRA") || absl::EqualsIgnoreCase(cmd, "PAT") ||
-      absl::EqualsIgnoreCase(cmd, "HEA") || absl::EqualsIgnoreCase(cmd, "UPG")) {
-    is_http = true;
-  }
-  if (!is_http) {
-    SNOVA_ERROR("Not http connection with first 3bytes:{}", cmd);
-    co_return;
-  }
-
   absl::string_view head_end("\r\n\r\n", 4);
+  absl::string_view crlf("\r\n", 2);
   absl::string_view request_header_view;
   while (true) {
     absl::string_view view((const char*)(readable_data.data()), readable_data.size());
@@ -89,8 +76,6 @@ asio::awaitable<void> handle_http_connection(::asio::ip::tcp::socket&& s, IOBufP
     readable_data.remove_prefix(request_header_view.size());
     break;
   }
-
-  absl::string_view crlf("\r\n", 2);
   auto crlf_pos = request_header_view.find(crlf);
   absl::string_view request_line_view(request_header_view.data(), crlf_pos);
   request_line_view = absl::StripAsciiWhitespace(request_line_view);
@@ -142,7 +127,6 @@ asio::awaitable<void> handle_http_connection(::asio::ip::tcp::socket&& s, IOBufP
     }
   }
   absl::string_view kk;
-
   int rcc = parse_http_hostport(all_data, kk);
 
   SNOVA_INFO("host:{}, port:{}, path_view:{}, {}/{}", host_view, port, path_view, rcc, kk);
@@ -157,6 +141,7 @@ asio::awaitable<void> handle_http_connection(::asio::ip::tcp::socket&& s, IOBufP
     co_await client_relay(std::move(sock), Bytes{}, std::string(host_view.data(), host_view.size()),
                           port, true);
   } else {
+    // todo
   }
   co_return;
 }

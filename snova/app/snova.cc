@@ -50,6 +50,7 @@ ABSL_FLAG(std::string, user, "demo_user", "Auth user name");
 ABSL_FLAG(bool, entry, false, "Run as entry node.");
 ABSL_FLAG(bool, middle, false, "Run as middle node.");
 ABSL_FLAG(bool, exit, false, "Run as exit node.");
+ABSL_FLAG(bool, redirect, false, "Run as redirect server for entry node.");
 
 static int error_exit(const std::string& error) {
   printf("ERROR: %s\n", error.c_str());

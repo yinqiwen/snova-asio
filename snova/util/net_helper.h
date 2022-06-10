@@ -38,4 +38,6 @@ namespace snova {
 using PaserEndpointResult = std::pair<std::unique_ptr<::asio::ip::tcp::endpoint>, std::error_code>;
 PaserEndpointResult parse_endpoint(const std::string& addr);
 
+int get_orig_dst(int fd, ::asio::ip::tcp::endpoint& endpoint);
+
 }  // namespace snova

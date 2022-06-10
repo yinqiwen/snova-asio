@@ -43,6 +43,7 @@ std::shared_ptr<MuxClient>& MuxClient::GetInstance() {
   static std::shared_ptr<MuxClient> g_instance = std::make_shared<MuxClient>();
   return g_instance;
 }
+
 asio::awaitable<std::error_code> MuxClient::NewConnection(uint32_t idx) {
   if (idx >= remote_conns_.size()) {
     co_return std::make_error_code(std::errc::invalid_argument);

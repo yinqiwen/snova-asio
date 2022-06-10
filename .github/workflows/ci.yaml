@@ -23,7 +23,7 @@ jobs:
         env:
             CC: gcc-11
             CXX: g++-11
-      - run: tar czf snova_asio_linux_amd64.tar.gz -C ./bazel-bin/snova/app/ snova-local snova-remote
+      - run: tar czf snova_asio_linux_amd64.tar.gz -C ./bazel-bin/snova/app/ snova
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: bazelbuild/setup-bazelisk@v2
       - run: bazel.exe build --cxxopt=/std:c++20 //...
-      - run: tar czf snova_asio_windows_amd64.tar.gz -C ./bazel-bin/snova/app/ snova-local.exe snova-remote.exe
+      - run: tar czf snova_asio_windows_amd64.tar.gz -C ./bazel-bin/snova/app/ snova.exe 
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
@@ -47,7 +47,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: bazelbuild/setup-bazelisk@v2
       - run: bazel build --cxxopt=-std=c++20  //...
-      - run: tar czf snova_asio_darwin_amd64.tar.gz -C ./bazel-bin/snova/app/ snova-local snova-remote
+      - run: tar czf snova_asio_darwin_amd64.tar.gz -C ./bazel-bin/snova/app/ snova
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')

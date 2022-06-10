@@ -27,7 +27,13 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/util/net_helper.h"
+#ifdef __linux__
+#include <netinet/in.h>
+#include <sys/socket.h>
+#endif
+#include <array>
 #include <memory>
+
 #include "absl/strings/str_split.h"
 
 namespace snova {
@@ -46,4 +52,28 @@ PaserEndpointResult parse_endpoint(const std::string& addr) {
       std::make_unique<::asio::ip::tcp::endpoint>(::asio::ip::make_address(host_ports[0]), port);
   return PaserEndpointResult{std::move(endpoint), std::error_code{}};
 }
+
+#define SO_ORIGINAL_DST 80
+int get_orig_dst(int fd, ::asio::ip::tcp::endpoint& endpoint) {
+#ifdef __linux__
+  struct sockaddr_in6 serverAddrV6;
+  struct sockaddr_in serverAddr;
+  int size = sizeof(serverAddr);
+  if (getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &serverAddr, (socklen_t*)&size) >= 0) {
+    endpoint = ::asio::ip::tcp::endpoint(
+        ::asio::ip::make_address_v4(ntohl(serverAddr.sin_addr.s_addr)), ntohs(serverAddr.sin_port));
+    return 0;
+  }
+  size = sizeof(serverAddrV6);
+  if (getsockopt(fd, SOL_IPV6, SO_ORIGINAL_DST, &serverAddrV6, (socklen_t*)&size) >= 0) {
+    std::array<uint8_t, 16> v6_ip;
+    memcpy(v6_ip.data(), serverAddrV6.sin6_addr.s6_addr, 16);
+    endpoint = ::asio::ip::tcp::endpoint(::asio::ip::make_address_v6(v6_ip),
+                                         ntohs(serverAddrV6.sin6_port));
+    return 0;
+  }
+#endif
+  return -1;
+}
+
 }  // namespace snova

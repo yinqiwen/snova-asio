@@ -30,7 +30,6 @@
 
 #include "snova/io/transfer.h"
 #include "snova/mux/mux_client.h"
-#include "snova/mux/mux_stream.h"
 
 #include "asio/experimental/awaitable_operators.hpp"
 
@@ -52,10 +51,33 @@ asio::awaitable<void> client_relay(::asio::ip::tcp::socket&& sock, const Bytes& 
     co_await stream->Write(std::move(tmp_buf), readed_data.size());
   }
   try {
-    co_await(transfer_socket(socket, stream) && transfer_stream(stream, socket));
+    co_await(transfer(socket, stream) && transfer(stream, socket));
   } catch (std::exception& ex) {
     SNOVA_ERROR("ex:{}", ex.what());
   }
   co_await stream->Close(false);
 }
+
+asio::awaitable<void> client_relay(StreamPtr local_stream, const Bytes& readed_data,
+                                   const std::string& remote_host, uint16_t remote_port,
+                                   bool is_tcp) {
+  auto ex = co_await asio::this_coro::executor;
+
+  EventWriterFactory factory = MuxClient::GetEventWriterFactory();
+  MuxStreamPtr remote_stream = MuxStream::New(std::move(factory), ex, MuxStream::NextID(true));
+  auto ec = co_await remote_stream->Open(remote_host, remote_port, is_tcp);
+  if (readed_data.size() > 0) {
+    IOBufPtr tmp_buf = get_iobuf(readed_data.size());
+    memcpy(tmp_buf->data(), readed_data.data(), readed_data.size());
+    co_await remote_stream->Write(std::move(tmp_buf), readed_data.size());
+  }
+  try {
+    co_await(transfer(local_stream, remote_stream) && transfer(remote_stream, local_stream));
+  } catch (std::exception& ex) {
+    SNOVA_ERROR("ex:{}", ex.what());
+  }
+  co_await remote_stream->Close(false);
+  co_await local_stream->Close(false);
+}
+
 }  // namespace snova

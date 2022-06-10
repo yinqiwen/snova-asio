@@ -29,6 +29,7 @@ cc_library(
         "//snova/util:net_helper",
         "//snova/util:sni",
         "@asio",
+        "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -81,6 +82,7 @@ cc_library(
     ],
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
+        ":local_relay",
         "//snova/io",
         "//snova/io:transfer",
         "//snova/log:log_api",
