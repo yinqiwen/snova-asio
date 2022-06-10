@@ -26,6 +26,7 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <stdio.h>
 #include <limits>
 #include <random>
 #include <string>
@@ -34,20 +35,32 @@
 #include "absl/flags/parse.h"
 #include "absl/flags/usage.h"
 #include "absl/flags/usage_config.h"
-// #include "absl/random/random.h"
 #include "absl/strings/match.h"
 #include "snova/log/log_macros.h"
 #include "snova/mux/mux_client.h"
 #include "snova/server/local_server.h"
+#include "snova/server/remote_server.h"
 #include "snova/util/misc_helper.h"
+#include "spdlog/fmt/bundled/ostream.h"
 ABSL_FLAG(std::string, listen, "127.0.0.1:48100", "Listen address");
 ABSL_FLAG(std::string, remote, "", "Remote server address");
 ABSL_FLAG(std::string, cipher_method, "chacha20_poly1305", "Cipher method");
 ABSL_FLAG(std::string, cipher_key, "default cipher key", "Cipher key");
 ABSL_FLAG(std::string, user, "demo_user", "Auth user name");
+ABSL_FLAG(bool, entry, false, "Run as entry node.");
+ABSL_FLAG(bool, middle, false, "Run as middle node.");
+ABSL_FLAG(bool, exit, false, "Run as exit node.");
+
+static int error_exit(const std::string& error) {
+  printf("ERROR: %s\n", error.c_str());
+  printf("Press Any Key To Exit");
+  getchar();
+  exit(-1);
+  return -1;
+}
 
 int main(int argc, char** argv) {
-  absl::SetProgramUsageMessage("local server for private proxy tools");
+  absl::SetProgramUsageMessage("private proxy node server");
   absl::FlagsUsageConfig usage_config;
   usage_config.contains_help_flags = [](absl::string_view path) -> bool {
     if (absl::StartsWith(path, "snova/")) {
@@ -62,25 +75,57 @@ int main(int argc, char** argv) {
   std::string auth_user = absl::GetFlag(FLAGS_user);
   std::string cipher_method = absl::GetFlag(FLAGS_cipher_method);
   std::string cipher_key = absl::GetFlag(FLAGS_cipher_key);
+  bool as_entry = absl::GetFlag(FLAGS_entry);
+  bool as_middle = absl::GetFlag(FLAGS_middle);
+  bool as_exit = absl::GetFlag(FLAGS_exit);
+  if (!as_entry && !as_middle && !as_exit) {
+    error_exit("Need to run as entry/middle/exit.");
+    return -1;
+  }
+  if (((uint8_t)as_entry + (uint8_t)as_middle + (uint8_t)as_exit) > 1) {
+    error_exit("Only one role coulde be select from entry/middle/exit.");
+    return -1;
+  }
 
-  uint64_t client_id = snova::random_uint64(0, std::numeric_limits<uint64_t>::max());
-  // absl::BitGen bitgen;
-  // uint64_t client_id = absl::Uniform<uint64_t>(bitgen, 0, std::numeric_limits<uint64_t>::max());
-  snova::MuxClient::GetInstance()->SetClientId(client_id);
-  SNOVA_INFO("Generated client_id:{}", client_id);
+  if (as_entry || as_middle) {
+    if (absl::GetFlag(FLAGS_remote).empty()) {
+      error_exit("'remote' is empty for entry/middle node.");
+      return -1;
+    }
+  }
   ::asio::io_context ctx;
-  ::asio::co_spawn(
-      ctx,
-      [&]() -> asio::awaitable<void> {
-        auto ec =
-            co_await snova::MuxClient::GetInstance()->Init(auth_user, cipher_method, cipher_key);
-        if (ec) {
-          co_return;
-        }
-        auto ex = co_await asio::this_coro::executor;
-        ::asio::co_spawn(ex, snova::start_local_server(listen), ::asio::detached);
-      },
-      ::asio::detached);
+
+  if (as_middle || as_entry) {
+    uint64_t client_id = snova::random_uint64(0, std::numeric_limits<uint64_t>::max());
+    // absl::BitGen bitgen;
+    // uint64_t client_id = absl::Uniform<uint64_t>(bitgen, 0,
+    // std::numeric_limits<uint64_t>::max());
+    snova::MuxClient::GetInstance()->SetClientId(client_id);
+    SNOVA_INFO("Generated client_id:{}", client_id);
+
+    ::asio::co_spawn(
+        ctx,
+        [&]() -> asio::awaitable<void> {
+          auto ec =
+              co_await snova::MuxClient::GetInstance()->Init(auth_user, cipher_method, cipher_key);
+          if (ec) {
+            SNOVA_ERROR("Failed to init mux client with error:{}", ec);
+            co_return;
+          }
+          auto ex = co_await asio::this_coro::executor;
+          if (as_entry) {
+            ::asio::co_spawn(ex, snova::start_local_server(listen), ::asio::detached);
+          } else {
+            ::asio::co_spawn(ctx, snova::start_remote_server(listen, cipher_method, cipher_key),
+                             ::asio::detached);
+          }
+        },
+        ::asio::detached);
+  }
+  if (as_exit) {
+    ::asio::co_spawn(ctx, snova::start_remote_server(listen, cipher_method, cipher_key),
+                     ::asio::detached);
+  }
   ctx.run();
   return 0;
 }

@@ -27,14 +27,14 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/io/io.h"
-#include <deque>
+#include <stack>
 
 namespace snova {
-static std::deque<IOBuf*> g_io_bufs;
+static std::stack<IOBuf*> g_io_bufs;
 static constexpr uint32_t kIOBufPoolSize = 64;
 void IOBufDeleter::operator()(IOBuf* v) const {
   if (g_io_bufs.size() < kIOBufPoolSize) {
-    g_io_bufs.emplace_back(v);
+    g_io_bufs.push(v);
     return;
   }
   delete v;
@@ -43,8 +43,8 @@ static IOBuf* get_raw_iobuf() {
   if (g_io_bufs.empty()) {
     return new IOBuf;
   }
-  IOBuf* p = g_io_bufs.front();
-  g_io_bufs.pop_front();
+  IOBuf* p = g_io_bufs.top();
+  g_io_bufs.pop();
   return p;
 }
 
