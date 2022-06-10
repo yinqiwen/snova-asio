@@ -179,6 +179,11 @@ int CipherContext::Decrypt(const Bytes& in, std::unique_ptr<MuxEvent>& out, size
     // SNOVA_INFO("Decrypt header len:{}", olen);
     head.Decode(Bytes{head_buf, kEventHeadSize});
   }
+  if (head.len > (kMaxChunkSize + 128)) {
+    SNOVA_ERROR("Too large event len:{}", head.len);
+    return ERR_INVALID_EVENT;
+  }
+
   decrypt_len += (kEventHeadSize + cipher_tag_len_);
   if (in.size() < (kEventHeadSize + head.len + 2 * cipher_tag_len_)) {
     return ERR_NEED_MORE_INPUT_DATA;

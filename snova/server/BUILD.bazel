@@ -23,6 +23,7 @@ cc_library(
     deps = [
         ":local_relay",
         "//snova/io",
+        "//snova/io:read_until",
         "//snova/log:log_api",
         "//snova/mux:mux_client",
         "//snova/util:http_helper",

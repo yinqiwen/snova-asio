@@ -54,6 +54,9 @@ asio::awaitable<ServerAuthResult> MuxConnection::ServerAuth() {
   std::unique_ptr<MuxEvent> auth_req;
   int rc = co_await ReadEvent(auth_req);
   if (0 != rc) {
+    SNOVA_ERROR(
+        "Oops! Read auth request failed with rc:{}, maybe the client cipher config is invalid.",
+        rc);
     co_return ServerAuthResult{0, false};
   }
   AuthRequest* auth_req_event = dynamic_cast<AuthRequest*>(auth_req.get());
@@ -86,12 +89,15 @@ asio::awaitable<bool> MuxConnection::ClientAuth(const std::string& user, uint64_
   auth->client_id = client_id;
   bool write_success = co_await WriteEvent(std::move(auth));
   if (!write_success) {
+    SNOVA_ERROR("Write auth request failed.");
     co_return false;
   }
   // SNOVA_INFO("Success to send auth request.");
   std::unique_ptr<MuxEvent> auth_res;
   int rc = co_await ReadEvent(auth_res);
   if (0 != rc) {
+    SNOVA_ERROR("Oops! Read auth response failed with rc:{}, maybe the cipher config is invalid.",
+                rc);
     co_return false;
   }
   AuthResponse* auth_res_event = dynamic_cast<AuthResponse*>(auth_res.get());
@@ -214,7 +220,7 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
 asio::awaitable<void> MuxConnection::ReadEventLoop() {
   while (true) {
     int rc = co_await ProcessReadEvent();
-    if (0 != rc) {
+    if (0 != rc && ERR_NEED_MORE_INPUT_DATA != rc) {
       Close();
       co_return;
     }

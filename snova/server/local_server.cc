@@ -36,7 +36,9 @@
 #include "absl/strings/str_split.h"
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/log/log_macros.h"
+#include "snova/server/local_relay.h"
 #include "snova/util/net_helper.h"
+#include "spdlog/fmt/bundled/ostream.h"
 
 ABSL_DECLARE_FLAG(bool, entry);
 ABSL_DECLARE_FLAG(bool, redirect);
@@ -44,8 +46,8 @@ namespace snova {
 static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
   std::unique_ptr<::asio::ip::tcp::endpoint> remote_endpoint;
   bool is_entry_node = absl::GetFlag(FLAGS_entry);
-  bool is_redirect_role = absl::GetFlag(FLAGS_redirect);
-  if (is_entry_node && is_redirect_role) {
+  bool is_redirect = absl::GetFlag(FLAGS_redirect);
+  if (is_entry_node && is_redirect) {
     remote_endpoint = std::make_unique<::asio::ip::tcp::endpoint>();
     if (0 != get_orig_dst(sock.native_handle(), *remote_endpoint)) {
       remote_endpoint.release();
@@ -68,9 +70,9 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
   }
   Bytes readable(buffer->data(), n);
   absl::string_view cmd3((const char*)(readable.data()), 3);
-  if (!is_redirect_role && (*buffer)[0] == 5) {  // socks5
+  if (!is_redirect && (*buffer)[0] == 5) {  // socks5
     co_await handle_socks5_connection(std::move(sock), std::move(buffer), readable);
-  } else if (!is_redirect_role && (*buffer)[0] == 4) {  // socks4
+  } else if (!is_redirect && (*buffer)[0] == 4) {  // socks4
     SNOVA_ERROR("Socks4 not supported!");
     co_return;
   } else if ((*buffer)[0] == 0x16) {  // tls
@@ -88,6 +90,14 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
              absl::EqualsIgnoreCase(cmd3, "HEA") || absl::EqualsIgnoreCase(cmd3, "UPG")) {
     co_await handle_http_connection(std::move(sock), std::move(buffer), readable);
   } else {  // other
+    if (remote_endpoint) {
+      // just relay to remote
+      SNOVA_INFO("Redirect proxy connection to {}.", *remote_endpoint);
+      co_await client_relay(std::move(sock), readable, remote_endpoint->address().to_string(),
+                            remote_endpoint->port(), true);
+    } else {
+      // no remote host&port to relay
+    }
   }
   co_return;
 }

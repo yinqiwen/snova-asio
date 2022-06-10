@@ -30,3 +30,14 @@ cc_library(
         "//snova/log:log_api",
     ],
 )
+
+cc_library(
+    name = "read_until",
+    srcs = ["read_until.cc"],
+    hdrs = ["read_until.h"],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        ":io",
+        "//snova/log:log_api",
+    ],
+)
