@@ -33,8 +33,10 @@
 #include "spdlog/fmt/bundled/ostream.h"
 
 namespace snova {
-static uint32_t g_mux_conn_size = 0;
-size_t MuxConnection::Size() { return g_mux_conn_size; }
+static uint32_t g_mux_conn_num = 0;
+static uint32_t g_mux_conn_num_in_loop = 0;
+size_t MuxConnection::Size() { return g_mux_conn_num; }
+size_t MuxConnection::ActiveSize() { return g_mux_conn_num_in_loop; }
 MuxConnection::MuxConnection(::asio::ip::tcp::socket&& sock,
                              std::unique_ptr<CipherContext>&& cipher_ctx, bool is_local)
     : socket_(std::move(sock)),
@@ -45,9 +47,9 @@ MuxConnection::MuxConnection(::asio::ip::tcp::socket&& sock,
       is_authed_(false) {
   write_buffer_.resize(kMaxChunkSize + kEventHeadSize + kReservedBufferSize);
   read_buffer_.resize(2 * kMaxChunkSize);
-  g_mux_conn_size++;
+  g_mux_conn_num++;
 }
-MuxConnection::~MuxConnection() { g_mux_conn_size--; }
+MuxConnection::~MuxConnection() { g_mux_conn_num--; }
 
 asio::awaitable<ServerAuthResult> MuxConnection::ServerAuth() {
   if (is_local_) {
@@ -228,13 +230,16 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
 }
 
 asio::awaitable<void> MuxConnection::ReadEventLoop() {
+  g_mux_conn_num_in_loop++;
   while (true) {
     int rc = co_await ProcessReadEvent();
     if (0 != rc && ERR_NEED_MORE_INPUT_DATA != rc) {
-      Close();
-      co_return;
+      break;
     }
   }
+  Close();
+  g_mux_conn_num_in_loop--;
+  SNOVA_INFO("Close mux connection:{}", idx_);
 }
 
 void MuxConnection::Close() { socket_.close(); }

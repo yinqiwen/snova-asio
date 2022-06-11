@@ -145,7 +145,14 @@ EventWriterFactory MuxClient::GetEventWriterFactory() {
     if (!conn) {
       return {};
     }
-    return std::bind(&MuxConnection::Write, conn, std::placeholders::_1);
+    uint32_t conn_idx = conn->GetIdx();
+    return [conn_idx](std::unique_ptr<MuxEvent>&& event) -> asio::awaitable<bool> {
+      auto write_conn = MuxClient::GetInstance()->remote_conns_[conn_idx];
+      if (write_conn) {
+        co_return co_await write_conn->Write(std::move(event));
+      }
+      co_return false;
+    };
   };
   return f;
 }
@@ -154,8 +161,9 @@ void register_mux_stat() {
   register_stat_func([]() -> StatValues {
     StatValues vals;
     auto& kv = vals["Mux"];
-    kv["stream_size"] = std::to_string(MuxStream::Size());
-    kv["connection_size"] = std::to_string(MuxConnection::Size());
+    kv["stream_num"] = std::to_string(MuxStream::Size());
+    kv["connection_num"] = std::to_string(MuxConnection::Size());
+    kv["connection_active_num"] = std::to_string(MuxConnection::ActiveSize());
     return vals;
   });
 }

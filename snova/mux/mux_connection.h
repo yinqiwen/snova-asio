@@ -50,6 +50,7 @@ using ServerRelayFunc = std::function<asio::awaitable<void>(uint64_t, std::uniqu
 class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
  public:
   static size_t Size();
+  static size_t ActiveSize();
   MuxConnection(::asio::ip::tcp::socket&& sock, std::unique_ptr<CipherContext>&& cipher_ctx,
                 bool is_local);
   asio::awaitable<bool> ClientAuth(const std::string& user, uint64_t client_id);
@@ -58,6 +59,7 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
 
   void SetServerRelayFunc(ServerRelayFunc&& f) { server_relay_ = std::move(f); }
   void SetIdx(uint32_t idx) { idx_ = idx; }
+  uint32_t GetIdx() const { return idx_; }
 
   ~MuxConnection();
   asio::awaitable<bool> Write(std::unique_ptr<MuxEvent>&& write_ev);
