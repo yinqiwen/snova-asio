@@ -23,6 +23,7 @@ cc_library(
         "//snova/io",
         "//snova/log:log_api",
         "//snova/util:net_helper",
+        "//snova/util:stat",
         "@asio",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",

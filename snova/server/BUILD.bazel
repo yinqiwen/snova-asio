@@ -30,6 +30,7 @@ cc_library(
         "//snova/util:net_helper",
         "//snova/util:sni",
         "@asio",
+        "@com_google_absl//absl/cleanup",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
     ],
@@ -52,6 +53,7 @@ cc_library(
         "//snova/mux:mux_server",
         "//snova/util:net_helper",
         "@asio",
+        "@com_google_absl//absl/cleanup",
         "@com_google_absl//absl/strings",
     ],
 )

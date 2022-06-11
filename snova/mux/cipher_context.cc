@@ -206,7 +206,7 @@ int CipherContext::Decrypt(const Bytes& in, std::unique_ptr<MuxEvent>& out, size
         head.len + cipher_tag_len_, decode_buffer_.data(), decode_buffer_.size(), &olen,
         cipher_tag_len_);
     if (0 != rc) {
-      SNOVA_ERROR("Failed to decrypt header with rc:{}", rc);
+      SNOVA_ERROR("Failed to decrypt event body with rc:{}, data len:{}", rc, head.len);
       return rc;
     }
     // SNOVA_INFO("Decrypt total len:{}", olen);

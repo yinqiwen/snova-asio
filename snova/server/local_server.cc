@@ -30,6 +30,7 @@
 #include <string_view>
 #include <system_error>
 
+#include "absl/cleanup/cleanup.h"
 #include "absl/flags/declare.h"
 #include "absl/flags/flag.h"
 #include "absl/strings/match.h"
@@ -38,12 +39,17 @@
 #include "snova/log/log_macros.h"
 #include "snova/server/local_relay.h"
 #include "snova/util/net_helper.h"
+#include "snova/util/stat.h"
 #include "spdlog/fmt/bundled/ostream.h"
 
 ABSL_DECLARE_FLAG(bool, entry);
 ABSL_DECLARE_FLAG(bool, redirect);
 namespace snova {
+static uint32_t g_local_proxy_conn_num = 0;
+
 static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
+  g_local_proxy_conn_num++;
+  absl::Cleanup source_closer = [] { g_local_proxy_conn_num--; };
   std::unique_ptr<::asio::ip::tcp::endpoint> remote_endpoint;
   bool is_entry_node = absl::GetFlag(FLAGS_entry);
   bool is_redirect = absl::GetFlag(FLAGS_redirect);
@@ -122,6 +128,12 @@ asio::awaitable<std::error_code> start_local_server(const std::string& addr) {
   if (parse_result.second) {
     co_return parse_result.second;
   }
+  register_stat_func([]() -> StatValues {
+    StatValues vals;
+    auto& kv = vals["LocalServer"];
+    kv["local_proxy_conn_num"] = std::to_string(g_local_proxy_conn_num);
+    return vals;
+  });
 
   auto ex = co_await asio::this_coro::executor;
   ::asio::ip::tcp::endpoint& endpoint = *parse_result.first;

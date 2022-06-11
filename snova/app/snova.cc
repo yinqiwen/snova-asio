@@ -41,6 +41,7 @@
 #include "snova/server/local_server.h"
 #include "snova/server/remote_server.h"
 #include "snova/util/misc_helper.h"
+#include "snova/util/stat.h"
 #include "spdlog/fmt/bundled/ostream.h"
 #include "spdlog/fmt/fmt.h"
 
@@ -68,6 +69,11 @@ static int error_exit(const std::string& error) {
 #endif
   exit(-1);
   return -1;
+}
+
+static void init_stats() {
+  snova::register_io_stat();
+  snova::register_mux_stat();
 }
 
 int main(int argc, char** argv) {
@@ -139,6 +145,8 @@ int main(int argc, char** argv) {
                      snova::start_remote_server(listen, server_cipher_method, server_cipher_key),
                      ::asio::detached);
   }
+  init_stats();
+  ::asio::co_spawn(ctx, snova::start_stat_timer(30), ::asio::detached);
   ctx.run();
   return 0;
 }

@@ -28,13 +28,27 @@
  */
 #include "snova/io/io.h"
 #include <stack>
+#include "snova/util/stat.h"
 
 namespace snova {
 static std::stack<IOBuf*> g_io_bufs;
-static constexpr uint32_t kIOBufPoolSize = 64;
+static constexpr uint32_t kIOBufPoolSize = 128;
+static uint64_t g_iobuf_pool_bytes = 0;
+
+void register_io_stat() {
+  register_stat_func([]() -> StatValues {
+    StatValues vals;
+    auto& kv = vals["IOBuf"];
+    kv["pool_size"] = std::to_string(g_io_bufs.size());
+    kv["pool_bytes"] = std::to_string(g_iobuf_pool_bytes);
+    return vals;
+  });
+}
+
 void IOBufDeleter::operator()(IOBuf* v) const {
   if (g_io_bufs.size() < kIOBufPoolSize) {
     g_io_bufs.push(v);
+    g_iobuf_pool_bytes += v->capacity();
     return;
   }
   delete v;
@@ -45,6 +59,7 @@ static IOBuf* get_raw_iobuf() {
   }
   IOBuf* p = g_io_bufs.top();
   g_io_bufs.pop();
+  g_iobuf_pool_bytes -= p->capacity();
   return p;
 }
 

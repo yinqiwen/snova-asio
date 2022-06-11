@@ -33,6 +33,7 @@
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/log/log_macros.h"
 #include "snova/util/net_helper.h"
+#include "snova/util/stat.h"
 #include "spdlog/fmt/bundled/ostream.h"
 
 ABSL_DECLARE_FLAG(std::string, remote);
@@ -147,6 +148,16 @@ EventWriterFactory MuxClient::GetEventWriterFactory() {
     return std::bind(&MuxConnection::Write, conn, std::placeholders::_1);
   };
   return f;
+}
+
+void register_mux_stat() {
+  register_stat_func([]() -> StatValues {
+    StatValues vals;
+    auto& kv = vals["Mux"];
+    kv["stream_size"] = std::to_string(MuxStream::Size());
+    kv["connection_size"] = std::to_string(MuxConnection::Size());
+    return vals;
+  });
 }
 
 }  // namespace snova

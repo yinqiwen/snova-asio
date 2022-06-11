@@ -39,6 +39,8 @@ static MuxStreamTable g_streams;
 static std::atomic<uint32_t> g_client_sid{1};
 static std::atomic<uint32_t> g_server_sid{2};
 
+size_t MuxStream::Size() { return g_streams.size(); }
+
 uint32_t MuxStream::NextID(bool is_client) {
   if (is_client) {
     return g_client_sid.fetch_add(2);
@@ -61,7 +63,7 @@ MuxStreamPtr MuxStream::Get(uint32_t sid) {
 
 MuxStream::MuxStream(EventWriterFactory&& factory, StreamDataChannelExecutor& ex, uint32_t sid)
     : event_writer_factory_(std::move(factory)),
-      data_channel_(ex, 32),
+      data_channel_(ex, 1),
       sid_(sid),
       is_remote_closed_(false) {
   event_writer_ = event_writer_factory_();

@@ -56,4 +56,6 @@ class MuxClient {
   uint32_t select_cursor_ = 0;
   uint64_t client_id_ = 0;
 };
+void register_mux_stat();
+
 }  // namespace snova

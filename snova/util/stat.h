@@ -28,21 +28,17 @@
  */
 
 #pragma once
+#include <functional>
 #include <string>
-#include <system_error>
-#include <vector>
-
+#include <tuple>
+#include <unordered_map>
 #include "asio.hpp"
-#include "asio/experimental/awaitable_operators.hpp"
-#include "snova/io/io.h"
 namespace snova {
-asio::awaitable<std::error_code> start_local_server(const std::string& addr);
+using StatKeyValue = std::unordered_map<std::string, std::string>;
+using StatValues = std::unordered_map<std::string, StatKeyValue>;
+using CollectStatFunc = std::function<StatValues()>;
+void register_stat_func(CollectStatFunc&& func);
 
-asio::awaitable<void> handle_socks5_connection(::asio::ip::tcp::socket&& sock,
-                                               IOBufPtr&& read_buffer, Bytes& readable_data);
-asio::awaitable<void> handle_tls_connection(::asio::ip::tcp::socket&& sock, IOBufPtr&& read_buffer,
-                                            Bytes& readable_data);
-asio::awaitable<void> handle_http_connection(::asio::ip::tcp::socket&& sock, IOBufPtr&& read_buffer,
-                                             Bytes& readable_data);
+asio::awaitable<void> start_stat_timer(uint32_t period_secs);
 
 }  // namespace snova

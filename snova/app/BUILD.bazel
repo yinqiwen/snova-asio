@@ -26,6 +26,7 @@ cc_binary(
         "//snova/server:local_server",
         "//snova/server:remote_server",
         "//snova/util:misc_helper",
+        "//snova/util:stat",
         "@com_google_absl//absl/flags:config",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/flags:parse",

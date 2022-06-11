@@ -62,4 +62,6 @@ struct Stream {
 using StreamPtr = std::shared_ptr<Stream>;
 using SocketRef = ::asio::ip::tcp::socket&;
 
+void register_io_stat();
+
 }  // namespace snova

@@ -30,6 +30,7 @@
 #include <string_view>
 #include <system_error>
 
+#include "absl/cleanup/cleanup.h"
 #include "absl/strings/str_split.h"
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/log/log_macros.h"
@@ -37,10 +38,14 @@
 #include "snova/mux/mux_server.h"
 #include "snova/server/remote_relay.h"
 #include "snova/util/net_helper.h"
+#include "snova/util/stat.h"
 
 namespace snova {
+static uint32_t g_remote_server_conn_num = 0;
 static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock, std::string cipher_method,
                                            std::string cipher_key) {
+  g_remote_server_conn_num++;
+  absl::Cleanup source_closer = [] { g_remote_server_conn_num--; };
   std::unique_ptr<CipherContext> cipher_ctx = CipherContext::New(cipher_method, cipher_key);
   MuxConnectionPtr mux_conn =
       std::make_shared<MuxConnection>(std::move(sock), std::move(cipher_ctx), false);
@@ -79,6 +84,12 @@ asio::awaitable<std::error_code> start_remote_server(const std::string& addr,
                                                      const std::string& cipher_method,
                                                      const std::string& cipher_key) {
   SNOVA_INFO("Start listen on address:{} with cipher_method:{}", addr, cipher_method);
+  register_stat_func([]() -> StatValues {
+    StatValues vals;
+    auto& kv = vals["RemoteServer"];
+    kv["remote_server_conn_num"] = std::to_string(g_remote_server_conn_num);
+    return vals;
+  });
   std::unique_ptr<CipherContext> cipher_ctx = CipherContext::New(cipher_method, cipher_key);
   if (!cipher_ctx) {
     co_return std::make_error_code(std::errc::invalid_argument);
