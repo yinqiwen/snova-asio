@@ -60,6 +60,6 @@ struct Stream {
   virtual ~Stream() = default;
 };
 using StreamPtr = std::shared_ptr<Stream>;
-using SocketPtr = std::shared_ptr<::asio::ip::tcp::socket>;
+using SocketRef = ::asio::ip::tcp::socket&;
 
 }  // namespace snova

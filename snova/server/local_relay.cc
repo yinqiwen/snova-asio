@@ -28,41 +28,38 @@
  */
 #include "snova/server/local_relay.h"
 
+#include "asio/experimental/as_tuple.hpp"
+#include "asio/experimental/awaitable_operators.hpp"
 #include "snova/io/transfer.h"
 #include "snova/mux/mux_client.h"
-
-#include "asio/experimental/awaitable_operators.hpp"
+#include "snova/util/net_helper.h"
 
 using namespace asio::experimental::awaitable_operators;
 namespace snova {
 
-asio::awaitable<void> client_relay(::asio::ip::tcp::socket&& sock, const Bytes& readed_data,
-                                   const std::string& remote_host, uint16_t remote_port,
-                                   bool is_tcp) {
-  ::asio::ip::tcp::socket socket(std::move(sock));  //  make rvalue sock not release after co_await
-  auto ex = co_await asio::this_coro::executor;
-
-  EventWriterFactory factory = MuxClient::GetEventWriterFactory();
-  MuxStreamPtr stream = MuxStream::New(std::move(factory), ex, MuxStream::NextID(true));
-  auto ec = co_await stream->Open(remote_host, remote_port, is_tcp);
-  if (readed_data.size() > 0) {
-    IOBufPtr tmp_buf = get_iobuf(readed_data.size());
-    memcpy(tmp_buf->data(), readed_data.data(), readed_data.size());
-    co_await stream->Write(std::move(tmp_buf), readed_data.size());
+template <typename T>
+static asio::awaitable<void> do_client_relay(T& local_stream, const Bytes& readed_data,
+                                             const std::string& remote_host, uint16_t remote_port,
+                                             bool is_tcp) {
+  bool direct_relay = false;
+  // TODO
+  if (direct_relay) {
+    auto remote_socket = co_await get_connected_socket(remote_host, remote_port, is_tcp);
+    if (remote_socket) {
+      if (readed_data.size() > 0) {
+        co_await ::asio::async_write(*remote_socket,
+                                     ::asio::buffer(readed_data.data(), readed_data.size()),
+                                     ::asio::experimental::as_tuple(::asio::use_awaitable));
+      }
+      try {
+        co_await(transfer(local_stream, *remote_socket) && transfer(*remote_socket, local_stream));
+      } catch (std::exception& ex) {
+        SNOVA_ERROR("ex:{}", ex.what());
+      }
+    }
+    co_return;
   }
-  try {
-    co_await(transfer(socket, stream) && transfer(stream, socket));
-  } catch (std::exception& ex) {
-    SNOVA_ERROR("ex:{}", ex.what());
-  }
-  co_await stream->Close(false);
-}
-
-asio::awaitable<void> client_relay(StreamPtr local_stream, const Bytes& readed_data,
-                                   const std::string& remote_host, uint16_t remote_port,
-                                   bool is_tcp) {
   auto ex = co_await asio::this_coro::executor;
-
   EventWriterFactory factory = MuxClient::GetEventWriterFactory();
   MuxStreamPtr remote_stream = MuxStream::New(std::move(factory), ex, MuxStream::NextID(true));
   auto ec = co_await remote_stream->Open(remote_host, remote_port, is_tcp);
@@ -77,6 +74,19 @@ asio::awaitable<void> client_relay(StreamPtr local_stream, const Bytes& readed_d
     SNOVA_ERROR("ex:{}", ex.what());
   }
   co_await remote_stream->Close(false);
+}
+
+asio::awaitable<void> client_relay(::asio::ip::tcp::socket&& sock, const Bytes& readed_data,
+                                   const std::string& remote_host, uint16_t remote_port,
+                                   bool is_tcp) {
+  ::asio::ip::tcp::socket socket(std::move(sock));  //  make rvalue sock not release after co_await
+  co_await do_client_relay(socket, readed_data, remote_host, remote_port, is_tcp);
+}
+
+asio::awaitable<void> client_relay(StreamPtr local_stream, const Bytes& readed_data,
+                                   const std::string& remote_host, uint16_t remote_port,
+                                   bool is_tcp) {
+  co_await do_client_relay(local_stream, readed_data, remote_host, remote_port, is_tcp);
   co_await local_stream->Close(false);
 }
 

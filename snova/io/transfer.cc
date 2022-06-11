@@ -89,5 +89,23 @@ asio::awaitable<void> transfer(::asio::ip::tcp::socket& from, StreamPtr to) {
   }
   co_return;
 }
+asio::awaitable<void> transfer(::asio::ip::tcp::socket& from, ::asio::ip::tcp::socket& to) {
+  while (true) {
+    IOBufPtr buf = get_iobuf(kMaxChunkSize);
+    auto [ec, n] =
+        co_await from.async_read_some(::asio::buffer(buf->data(), buf->size()),
+                                      ::asio::experimental::as_tuple(::asio::use_awaitable));
+    if (ec) {
+      break;
+    }
+
+    auto [wec, wn] = co_await ::asio::async_write(
+        to, ::asio::buffer(buf->data(), n), ::asio::experimental::as_tuple(::asio::use_awaitable));
+    if (wec) {
+      break;
+    }
+  }
+  co_return;
+}
 
 }  // namespace snova

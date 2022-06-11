@@ -35,5 +35,6 @@ namespace snova {
 asio::awaitable<void> transfer(StreamPtr from, StreamPtr to);
 asio::awaitable<void> transfer(StreamPtr from, ::asio::ip::tcp::socket& to);
 asio::awaitable<void> transfer(::asio::ip::tcp::socket& from, StreamPtr to);
+asio::awaitable<void> transfer(::asio::ip::tcp::socket& from, ::asio::ip::tcp::socket& to);
 
 }  // namespace snova

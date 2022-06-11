@@ -40,4 +40,8 @@ PaserEndpointResult parse_endpoint(const std::string& addr);
 
 int get_orig_dst(int fd, ::asio::ip::tcp::endpoint& endpoint);
 
+using SocketPtr = std::unique_ptr<::asio::ip::tcp::socket>;
+asio::awaitable<SocketPtr> get_connected_socket(const std::string& host, uint16_t port,
+                                                bool is_tcp);
+
 }  // namespace snova
