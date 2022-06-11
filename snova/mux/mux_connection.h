@@ -74,7 +74,7 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
   MuxStreamPtr GetStream(uint32_t sid);
   asio::awaitable<int> ProcessReadEvent();
 
-  int ReadEventFromBuffer(std::unique_ptr<MuxEvent>& event);
+  int ReadEventFromBuffer(std::unique_ptr<MuxEvent>& event, Bytes& buffer);
   asio::awaitable<int> ReadEvent(std::unique_ptr<MuxEvent>& event);
 
   ::asio::ip::tcp::socket socket_;

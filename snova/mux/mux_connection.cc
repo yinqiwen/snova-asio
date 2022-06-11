@@ -115,50 +115,57 @@ asio::awaitable<bool> MuxConnection::ClientAuth(const std::string& user, uint64_
   }
   co_return success;
 }
-int MuxConnection::ReadEventFromBuffer(std::unique_ptr<MuxEvent>& event) {
-  if (readable_data_.size() == 0) {
+int MuxConnection::ReadEventFromBuffer(std::unique_ptr<MuxEvent>& event, Bytes& buffer) {
+  if (buffer.size() == 0) {
     return ERR_NEED_MORE_INPUT_DATA;
   }
   size_t decrypt_len = 0;
-  int rc = cipher_ctx_->Decrypt(readable_data_, event, decrypt_len);
+  int rc = cipher_ctx_->Decrypt(buffer, event, decrypt_len);
   if (0 == rc) {
-    readable_data_.remove_prefix(decrypt_len);
+    buffer.remove_prefix(decrypt_len);
     return 0;
   }
   if (rc != ERR_NEED_MORE_INPUT_DATA) {
     SNOVA_ERROR("Failed to read event with rc:{}", rc);
     return rc;
   }
-  if (read_buffer_.data() != readable_data_.data()) {
-    memmove(read_buffer_.data(), readable_data_.data(), readable_data_.size());
+  if (read_buffer_.data() != buffer.data()) {
+    memmove(read_buffer_.data(), buffer.data(), buffer.size());
   }
   return ERR_NEED_MORE_INPUT_DATA;
 }
 asio::awaitable<int> MuxConnection::ReadEvent(std::unique_ptr<MuxEvent>& event) {
+  Bytes current_read_buffer = readable_data_;
+  int rc = 0;
   while (true) {
-    int rc = ReadEventFromBuffer(event);
+    rc = ReadEventFromBuffer(event, current_read_buffer);
     if (rc == 0) {
-      co_return rc;
+      break;
     }
     if (rc != ERR_NEED_MORE_INPUT_DATA) {
-      co_return rc;
+      break;
     }
-    size_t read_pos = readable_data_.size();
+    size_t read_pos = current_read_buffer.size();
     // SNOVA_INFO("start read {} {}.", read_pos, read_buffer_.size() - read_pos);
     auto [ec, n] = co_await socket_.async_read_some(
         ::asio::buffer(read_buffer_.data() + read_pos, read_buffer_.size() - read_pos),
         ::asio::experimental::as_tuple(::asio::use_awaitable));
     if (ec) {
       SNOVA_ERROR("Failed to read event with error:{}", ec);
-      co_return ec.value();
+      rc = ec.value();
+      break;
     }
     if (0 == n) {  // EOF
       SNOVA_ERROR("Failed to read event with EOF.");
-      co_return ERR_READ_EOF;
+      rc = ERR_READ_EOF;
+      break;
     }
     // SNOVA_INFO("Read {} bytes.", n);
-    readable_data_ = Bytes{read_buffer_.data(), read_pos + n};
+    // readable_data_ = Bytes{read_buffer_.data(), read_pos + n};
+    current_read_buffer = absl::MakeSpan(read_buffer_.data(), read_pos + n);
   }
+  readable_data_ = current_read_buffer;
+  co_return rc;
 }
 
 asio::awaitable<int> MuxConnection::ProcessReadEvent() {
@@ -241,7 +248,7 @@ asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev)
       co_await ::asio::async_write(socket_, ::asio::buffer(wbuffer.data(), wbuffer.size()),
                                    ::asio::experimental::as_tuple(::asio::use_awaitable));
   if (ec) {
-    SNOVA_ERROR("Write auth request failed with error:{}", ec.value());
+    SNOVA_ERROR("Write event:{} failed with error:{}", write_ev->head.type, ec);
     co_return false;
   }
   co_return true;

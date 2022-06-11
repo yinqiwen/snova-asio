@@ -28,7 +28,7 @@
  */
 
 #pragma once
-#include <stdint.h>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>

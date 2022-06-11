@@ -218,6 +218,9 @@ int StreamChunk::Encode(MutableBytes& buffer) const {
 }
 int StreamChunk::Decode(const Bytes& buffer) {
   RETURN_NOT_OK(decode_int(buffer, 0, chunk_len));
+  if (chunk_len > 2 * kMaxChunkSize) {
+    return ERR_INVALID_EVENT;
+  }
   size_t pos = sizeof(chunk_len);
   if (buffer.size() < (pos + chunk_len)) {
     return ERR_TOO_SMALL_EVENT_DECODE_CONTENT;

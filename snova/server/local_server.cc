@@ -56,7 +56,7 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
 
   IOBufPtr buffer = get_iobuf(kMaxChunkSize);
   auto [ec, n] =
-      co_await sock.async_read_some(::asio::buffer(buffer->data(), buffer->size()),
+      co_await sock.async_read_some(::asio::buffer(buffer->data(), kMaxChunkSize),
                                     ::asio::experimental::as_tuple(::asio::use_awaitable));
   if (ec) {
     co_return;

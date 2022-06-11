@@ -28,7 +28,7 @@
  */
 
 #pragma once
-#include <stdint.h>
+#include <cstdint>
 namespace snova {
 uint64_t random_uint64(uint64_t min, uint64_t max);
 }

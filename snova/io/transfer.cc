@@ -76,7 +76,7 @@ asio::awaitable<void> transfer(::asio::ip::tcp::socket& from, StreamPtr to) {
   while (true) {
     IOBufPtr buf = get_iobuf(kMaxChunkSize);
     auto [ec, n] =
-        co_await from.async_read_some(::asio::buffer(buf->data(), buf->size()),
+        co_await from.async_read_some(::asio::buffer(buf->data(), kMaxChunkSize),
                                       ::asio::experimental::as_tuple(::asio::use_awaitable));
     if (ec) {
       break;
@@ -93,7 +93,7 @@ asio::awaitable<void> transfer(::asio::ip::tcp::socket& from, ::asio::ip::tcp::s
   while (true) {
     IOBufPtr buf = get_iobuf(kMaxChunkSize);
     auto [ec, n] =
-        co_await from.async_read_some(::asio::buffer(buf->data(), buf->size()),
+        co_await from.async_read_some(::asio::buffer(buf->data(), kMaxChunkSize),
                                       ::asio::experimental::as_tuple(::asio::use_awaitable));
     if (ec) {
       break;
