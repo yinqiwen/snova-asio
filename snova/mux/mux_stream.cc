@@ -117,6 +117,7 @@ asio::awaitable<std::error_code> MuxStream::Close(bool close_by_remote) {
   if (is_remote_closed_) {
     co_return std::error_code{};
   }
+  is_remote_closed_ = true;
   if (close_by_remote) {
     // do nothing
   } else {
@@ -127,7 +128,6 @@ asio::awaitable<std::error_code> MuxStream::Close(bool close_by_remote) {
       co_return std::make_error_code(std::errc::no_link);
     }
   }
-  is_remote_closed_ = true;
   co_return std::error_code{};
 }
 }  // namespace snova
