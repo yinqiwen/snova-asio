@@ -45,7 +45,7 @@ static uint32_t g_remote_server_conn_num = 0;
 static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock, std::string cipher_method,
                                            std::string cipher_key) {
   g_remote_server_conn_num++;
-  absl::Cleanup source_closer = [] { g_remote_server_conn_num--; };
+  absl::Cleanup auto_counter = [] { g_remote_server_conn_num--; };
   std::unique_ptr<CipherContext> cipher_ctx = CipherContext::New(cipher_method, cipher_key);
   MuxConnectionPtr mux_conn =
       std::make_shared<MuxConnection>(std::move(sock), std::move(cipher_ctx), false);

@@ -36,10 +36,12 @@
 namespace snova {
 using MuxStreamTable = absl::flat_hash_map<uint32_t, MuxStreamPtr>;
 static MuxStreamTable g_streams;
+static uint32_t g_active_stream_size = 0;
 static std::atomic<uint32_t> g_client_sid{1};
 static std::atomic<uint32_t> g_server_sid{2};
 
 size_t MuxStream::Size() { return g_streams.size(); }
+size_t MuxStream::ActiveSize() { return g_active_stream_size; }
 
 uint32_t MuxStream::NextID(bool is_client) {
   if (is_client) {
@@ -60,6 +62,7 @@ MuxStreamPtr MuxStream::Get(uint32_t sid) {
   }
   return found->second;
 }
+void MuxStream::Remove(uint32_t sid) { g_streams.erase(sid); }
 
 MuxStream::MuxStream(EventWriterFactory&& factory, StreamDataChannelExecutor& ex, uint32_t sid)
     : event_writer_factory_(std::move(factory)),
@@ -67,8 +70,9 @@ MuxStream::MuxStream(EventWriterFactory&& factory, StreamDataChannelExecutor& ex
       sid_(sid),
       is_remote_closed_(false) {
   event_writer_ = event_writer_factory_();
+  g_active_stream_size++;
 }
-MuxStream::~MuxStream() { g_streams.erase(sid_); }
+MuxStream::~MuxStream() { g_active_stream_size--; }
 
 asio::awaitable<std::error_code> MuxStream::Open(const std::string& host, uint16_t port,
                                                  bool is_tcp) {

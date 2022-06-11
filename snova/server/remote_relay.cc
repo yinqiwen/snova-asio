@@ -27,6 +27,7 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/server/remote_relay.h"
+#include "absl/cleanup/cleanup.h"
 #include "absl/flags/declare.h"
 #include "absl/flags/flag.h"
 #include "asio/experimental/awaitable_operators.hpp"
@@ -50,7 +51,11 @@ asio::awaitable<void> server_relay(uint64_t client_id, std::unique_ptr<MuxEvent>
   }
   auto ex = co_await asio::this_coro::executor;
   EventWriterFactory factory = MuxServer::GetInstance()->GetEventWriterFactory(client_id);
-  MuxStreamPtr local_stream = MuxStream::New(std::move(factory), ex, open_request->head.sid);
+  uint32_t local_stream_id = open_request->head.sid;
+  MuxStreamPtr local_stream = MuxStream::New(std::move(factory), ex, local_stream_id);
+  absl::Cleanup auto_remove_local_stream = [local_stream_id] {
+    MuxStream::Remove(local_stream_id);
+  };
 
   if (absl::GetFlag(FLAGS_middle)) {
     co_await client_relay(local_stream, Bytes{}, open_request->remote_host,
@@ -58,7 +63,6 @@ asio::awaitable<void> server_relay(uint64_t client_id, std::unique_ptr<MuxEvent>
   } else {
     auto remote_socket = co_await get_connected_socket(
         open_request->remote_host, open_request->remote_port, open_request->is_tcp);
-
     if (!remote_socket) {
       co_await local_stream->Close(false);
       co_return;

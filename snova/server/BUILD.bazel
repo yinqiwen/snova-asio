@@ -72,6 +72,7 @@ cc_library(
         "//snova/log:log_api",
         "//snova/mux:mux_client",
         "@asio",
+        "@com_google_absl//absl/cleanup",
     ],
 )
 
@@ -93,5 +94,6 @@ cc_library(
         "//snova/mux:mux_server",
         "//snova/mux:mux_stream",
         "@asio",
+        "@com_google_absl//absl/cleanup",
     ],
 )

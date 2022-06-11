@@ -162,6 +162,7 @@ void register_mux_stat() {
     StatValues vals;
     auto& kv = vals["Mux"];
     kv["stream_num"] = std::to_string(MuxStream::Size());
+    kv["stream_active_num"] = std::to_string(MuxStream::ActiveSize());
     kv["connection_num"] = std::to_string(MuxConnection::Size());
     kv["connection_active_num"] = std::to_string(MuxConnection::ActiveSize());
     return vals;

@@ -52,7 +52,9 @@ class MuxStream : public Stream {
   static MuxStreamPtr New(EventWriterFactory&& factory, StreamDataChannelExecutor& ex,
                           uint32_t sid);
   static MuxStreamPtr Get(uint32_t sid);
+  static void Remove(uint32_t sid);
   static size_t Size();
+  static size_t ActiveSize();
 
  private:
   MuxStream(EventWriterFactory&& factory, StreamDataChannelExecutor& ex, uint32_t sid);

@@ -28,6 +28,7 @@
  */
 #include "snova/server/local_relay.h"
 
+#include "absl/cleanup/cleanup.h"
 #include "asio/experimental/as_tuple.hpp"
 #include "asio/experimental/awaitable_operators.hpp"
 #include "snova/io/transfer.h"
@@ -61,7 +62,9 @@ static asio::awaitable<void> do_client_relay(T& local_stream, const Bytes& reade
   }
   auto ex = co_await asio::this_coro::executor;
   EventWriterFactory factory = MuxClient::GetEventWriterFactory();
-  MuxStreamPtr remote_stream = MuxStream::New(std::move(factory), ex, MuxStream::NextID(true));
+  uint32_t stream_id = MuxStream::NextID(true);
+  MuxStreamPtr remote_stream = MuxStream::New(std::move(factory), ex, stream_id);
+  absl::Cleanup auto_remove_remove_stream = [stream_id] { MuxStream::Remove(stream_id); };
   auto ec = co_await remote_stream->Open(remote_host, remote_port, is_tcp);
   if (readed_data.size() > 0) {
     IOBufPtr tmp_buf = get_iobuf(readed_data.size());
