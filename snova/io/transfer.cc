@@ -49,6 +49,7 @@ asio::awaitable<void> transfer(StreamPtr from, StreamPtr to) {
       break;
     }
   }
+  co_await to->Close(false);
   co_return;
 }
 
@@ -70,6 +71,7 @@ asio::awaitable<void> transfer(StreamPtr from, ::asio::ip::tcp::socket& to) {
       break;
     }
   }
+  to.close();
   co_return;
 }
 asio::awaitable<void> transfer(::asio::ip::tcp::socket& from, StreamPtr to) {
@@ -87,6 +89,7 @@ asio::awaitable<void> transfer(::asio::ip::tcp::socket& from, StreamPtr to) {
       break;
     }
   }
+  co_await to->Close(false);
   co_return;
 }
 asio::awaitable<void> transfer(::asio::ip::tcp::socket& from, ::asio::ip::tcp::socket& to) {
