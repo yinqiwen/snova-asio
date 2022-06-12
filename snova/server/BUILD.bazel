@@ -72,6 +72,8 @@ cc_library(
         "//snova/io:transfer",
         "//snova/log:log_api",
         "//snova/mux:mux_client",
+        "//snova/util:flags",
+        "//snova/util:time_wheel",
         "@asio",
         "@com_google_absl//absl/cleanup",
     ],

@@ -33,7 +33,9 @@
 #include "asio/experimental/awaitable_operators.hpp"
 #include "snova/io/transfer.h"
 #include "snova/mux/mux_client.h"
+#include "snova/util/flags.h"
 #include "snova/util/net_helper.h"
+#include "snova/util/time_wheel.h"
 
 using namespace asio::experimental::awaitable_operators;
 namespace snova {
@@ -71,11 +73,33 @@ static asio::awaitable<void> do_client_relay(T& local_stream, const Bytes& reade
     memcpy(tmp_buf->data(), readed_data.data(), readed_data.size());
     co_await remote_stream->Write(std::move(tmp_buf), readed_data.size());
   }
+  TransferRoutineFunc transfer_routine;
+  uint32_t latest_io_time = time(nullptr);
+  TimerTaskID transfer_timeout_task_id;
+  if (g_stream_io_timeout_secs > 0) {
+    transfer_routine = [&]() { latest_io_time = time(nullptr); };
+    TimerTask timer_task;
+    timer_task.timeout_callback = [&]() -> asio::awaitable<void> {
+      SNOVA_ERROR("[{}]Close stream since it's not active since {}s ago.", stream_id,
+                  time(nullptr) - latest_io_time);
+      co_await remote_stream->Close(false);
+      co_return;
+    };
+    timer_task.get_active_time = [&]() -> uint32_t { return latest_io_time; };
+    timer_task.timeout_secs = g_stream_io_timeout_secs;
+    transfer_timeout_task_id = TimeWheel::GetInstance()->Register(std::move(timer_task));
+  }
+
   try {
-    co_await(transfer(local_stream, remote_stream) && transfer(remote_stream, local_stream));
+    co_await(transfer(local_stream, remote_stream, transfer_routine) &&
+             transfer(remote_stream, local_stream, transfer_routine));
   } catch (std::exception& ex) {
     SNOVA_ERROR("ex:{}", ex.what());
   }
+  if (g_stream_io_timeout_secs > 0) {
+    TimeWheel::GetInstance()->Cancel(transfer_timeout_task_id);
+  }
+
   co_await remote_stream->Close(false);
 }
 

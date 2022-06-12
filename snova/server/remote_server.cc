@@ -83,7 +83,7 @@ static ::asio::awaitable<void> server_loop(::asio::ip::tcp::acceptor server,
 asio::awaitable<std::error_code> start_remote_server(const std::string& addr,
                                                      const std::string& cipher_method,
                                                      const std::string& cipher_key) {
-  SNOVA_INFO("Start listen on address:{} with cipher_method:{}", addr, cipher_method);
+  SNOVA_INFO("Start listen on address [{}] with cipher_method:{}", addr, cipher_method);
   register_stat_func([]() -> StatValues {
     StatValues vals;
     auto& kv = vals["RemoteServer"];

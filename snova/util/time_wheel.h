@@ -26,16 +26,36 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "snova/util/flags.h"
+
+#pragma once
+#include <functional>
+#include <utility>
+#include <vector>
+#include "asio.hpp"
 
 namespace snova {
-bool g_is_middle_node = false;
-bool g_is_entry_node = false;
-bool g_is_exit_node = false;
-bool g_is_redirect_node = false;
-std::string g_remote_server;
-uint32_t g_conn_num_per_server = 5;
-uint32_t g_iobuf_max_pool_size = 64;
-uint32_t g_stream_io_timeout_secs = 600;
+using TimeoutFunc = std::function<asio::awaitable<void>()>;
+using GetActiveTimeFunc = std::function<uint32_t()>;
+using TimerTaskID = std::pair<uint32_t, uint32_t>;
+struct TimerTask {
+  TimeoutFunc timeout_callback;
+  GetActiveTimeFunc get_active_time;
+  uint32_t timeout_secs = 0;
+  bool canceled = false;
+};
 
+class TimeWheel {
+ public:
+  static std::shared_ptr<TimeWheel>& GetInstance();
+  TimeWheel(uint32_t max_timeout_secs = 600);
+  TimerTaskID Register(TimerTask&& task);
+  void Cancel(const TimerTaskID& id);
+  asio::awaitable<void> Run();
+
+ private:
+  using TimerTaskQueue = std::vector<TimerTask>;
+  using TimeWheelQueue = std::vector<TimerTaskQueue>;
+  TimeWheelQueue time_wheel_;
+  uint32_t max_timeout_secs_;
+};
 }  // namespace snova

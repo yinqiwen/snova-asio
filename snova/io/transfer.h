@@ -28,13 +28,18 @@
  */
 
 #pragma once
-
+#include <functional>
 #include "snova/io/io.h"
 
 namespace snova {
-asio::awaitable<void> transfer(StreamPtr from, StreamPtr to);
-asio::awaitable<void> transfer(StreamPtr from, ::asio::ip::tcp::socket& to);
-asio::awaitable<void> transfer(::asio::ip::tcp::socket& from, StreamPtr to);
-asio::awaitable<void> transfer(::asio::ip::tcp::socket& from, ::asio::ip::tcp::socket& to);
+using TransferRoutineFunc = std::function<void()>;
+asio::awaitable<void> transfer(StreamPtr from, StreamPtr to,
+                               const TransferRoutineFunc& routine = {});
+asio::awaitable<void> transfer(StreamPtr from, ::asio::ip::tcp::socket& to,
+                               const TransferRoutineFunc& routine = {});
+asio::awaitable<void> transfer(SocketRef from, StreamPtr to,
+                               const TransferRoutineFunc& routine = {});
+asio::awaitable<void> transfer(SocketRef from, SocketRef to,
+                               const TransferRoutineFunc& routine = {});
 
 }  // namespace snova

@@ -34,7 +34,6 @@
 #include "snova/util/flags.h"
 #include "snova/util/net_helper.h"
 #include "snova/util/stat.h"
-#include "spdlog/fmt/bundled/ostream.h"
 
 namespace snova {
 std::shared_ptr<MuxClient>& MuxClient::GetInstance() {
@@ -111,7 +110,9 @@ asio::awaitable<void> MuxClient::CheckConnections() {
   std::chrono::milliseconds period(3000);
   while (true) {
     timer.expires_after(period);
-    co_await timer.async_wait(::asio::use_awaitable);
+    auto [wait_ec] =
+        co_await timer.async_wait(::asio::experimental::as_tuple(::asio::use_awaitable));
+    SNOVA_INFO("Wait ec:{}", wait_ec);
     for (uint32_t i = 0; i < g_conn_num_per_server; i++) {
       if (!remote_conns_[i]) {
         co_await NewConnection(i);

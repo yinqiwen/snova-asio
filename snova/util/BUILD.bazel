@@ -9,6 +9,22 @@ package(
 )
 
 cc_library(
+    name = "time_wheel",
+    srcs = [
+        "time_wheel.cc",
+    ],
+    hdrs = [
+        "time_wheel.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        ":flags",
+        "//snova/log:log_api",
+        "@asio",
+    ],
+)
+
+cc_library(
     name = "stat",
     srcs = [
         "stat.cc",

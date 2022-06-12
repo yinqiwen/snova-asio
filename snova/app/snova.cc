@@ -46,6 +46,7 @@
 #include "snova/util/flags.h"
 #include "snova/util/misc_helper.h"
 #include "snova/util/stat.h"
+#include "snova/util/time_wheel.h"
 #include "spdlog/fmt/bundled/ostream.h"
 #include "spdlog/fmt/fmt.h"
 
@@ -69,9 +70,10 @@ static void init_stats() {
 }
 
 int main(int argc, char** argv) {
-  CLI::App app{"SNOVA:A private proxy tools."};
+  CLI::App app{"SNOVA:A private proxy tool for low-end boxes."};
   app.set_version_flag("--version", std::string(SNOVA_VERSION));
-  std::string listen = "127.0.0.1:48100";
+  app.set_config("--config", "", "Config file path", false);
+  std::string listen = "0.0.0.0:48100";
   app.add_option("--listen", listen, "Listen address");
 
   std::string auth_user = "demo_user";
@@ -80,6 +82,8 @@ int main(int argc, char** argv) {
   app.add_option("--conn_num_per_server", snova::g_conn_num_per_server,
                  "Remote server connection number per server.");
   app.add_option("--max_iobuf_pool_size", snova::g_iobuf_max_pool_size, "IOBuf pool max size");
+  app.add_option("--stream_io_timeout_secs", snova::g_stream_io_timeout_secs,
+                 "Proxy stream IO timeout secs, default 300s");
 
   std::string client_cipher_method = "chacha20_poly1305";
   std::string client_cipher_key = "default cipher key";
@@ -148,6 +152,7 @@ int main(int argc, char** argv) {
   }
   init_stats();
   ::asio::co_spawn(ctx, snova::start_stat_timer(30), ::asio::detached);
+  ::asio::co_spawn(ctx, snova::TimeWheel::GetInstance()->Run(), ::asio::detached);
   ctx.run();
   return 0;
 }

@@ -37,6 +37,7 @@
 #include "snova/server/local_relay.h"
 #include "snova/util/flags.h"
 #include "snova/util/net_helper.h"
+#include "snova/util/time_wheel.h"
 
 namespace snova {
 using namespace asio::experimental::awaitable_operators;
@@ -66,10 +67,31 @@ asio::awaitable<void> server_relay(uint64_t client_id, std::unique_ptr<MuxEvent>
       co_await local_stream->Close(false);
       co_return;
     }
+    TransferRoutineFunc transfer_routine;
+    uint32_t latest_io_time = time(nullptr);
+    TimerTaskID transfer_timeout_task_id;
+    if (g_stream_io_timeout_secs > 0) {
+      transfer_routine = [&]() { latest_io_time = time(nullptr); };
+      TimerTask timer_task;
+      timer_task.timeout_callback = [&]() -> asio::awaitable<void> {
+        SNOVA_ERROR("[{}]Close stream since it's not active since {}s ago.", local_stream_id,
+                    time(nullptr) - latest_io_time);
+        co_await local_stream->Close(false);
+        co_return;
+      };
+      timer_task.get_active_time = [&]() -> uint32_t { return latest_io_time; };
+      timer_task.timeout_secs = g_stream_io_timeout_secs;
+      transfer_timeout_task_id = TimeWheel::GetInstance()->Register(std::move(timer_task));
+    }
+
     try {
-      co_await(transfer(*remote_socket, local_stream) && transfer(local_stream, *remote_socket));
+      co_await(transfer(*remote_socket, local_stream, transfer_routine) &&
+               transfer(local_stream, *remote_socket, transfer_routine));
     } catch (std::exception& ex) {
       SNOVA_ERROR("ex:{}", ex.what());
+    }
+    if (g_stream_io_timeout_secs > 0) {
+      TimeWheel::GetInstance()->Cancel(transfer_timeout_task_id);
     }
     co_await local_stream->Close(false);
   }

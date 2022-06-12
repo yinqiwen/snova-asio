@@ -28,6 +28,7 @@ cc_binary(
         "//snova/util:misc_helper",
         "//snova/util:stat",
         "//snova/util:flags",
+        "//snova/util:time_wheel",
         # "@com_google_absl//absl/flags:config",
         # "@com_google_absl//absl/flags:flag",
         # "@com_google_absl//absl/flags:parse",

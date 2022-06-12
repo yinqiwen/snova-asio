@@ -50,8 +50,12 @@ PaserEndpointResult parse_endpoint(const std::string& addr) {
   } catch (...) {
     return PaserEndpointResult{nullptr, std::make_error_code(std::errc::invalid_argument)};
   }
+  absl::string_view host_view = host_ports[0];
+  if (host_view.empty()) {
+    host_view = "0.0.0.0";
+  }
   auto endpoint =
-      std::make_unique<::asio::ip::tcp::endpoint>(::asio::ip::make_address(host_ports[0]), port);
+      std::make_unique<::asio::ip::tcp::endpoint>(::asio::ip::make_address(host_view), port);
   return PaserEndpointResult{std::move(endpoint), std::error_code{}};
 }
 
@@ -99,5 +103,4 @@ asio::awaitable<SocketPtr> get_connected_socket(const std::string& host, uint16_
   }
   co_return socket;
 }
-
 }  // namespace snova
