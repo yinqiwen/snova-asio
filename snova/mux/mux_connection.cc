@@ -131,7 +131,7 @@ int MuxConnection::ReadEventFromBuffer(std::unique_ptr<MuxEvent>& event, Bytes& 
     return 0;
   }
   if (rc != ERR_NEED_MORE_INPUT_DATA) {
-    SNOVA_ERROR("Failed to read event with rc:{}", rc);
+    SNOVA_ERROR("[{}]Failed to read event with rc:{}", idx_, rc);
     return rc;
   }
   if (read_buffer_.data() != buffer.data()) {
@@ -209,7 +209,7 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
     case EVENT_STREAM_CHUNK: {
       MuxStreamPtr stream = MuxStream::Get(event->head.sid);
       if (!stream) {
-        SNOVA_ERROR("[{}]No stream found to handle chunk.", event->head.sid);
+        SNOVA_ERROR("[{}][{}]No stream found to handle chunk.", idx_, event->head.sid);
       } else {
         StreamChunk* chunk = dynamic_cast<StreamChunk*>(event.get());
         if (nullptr == chunk) {
@@ -221,7 +221,7 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
       break;
     }
     default: {
-      SNOVA_ERROR("[{}]Unknown event type:{}", event->head.sid, event->head.type);
+      SNOVA_ERROR("[{}][{}]Unknown event type:{}", idx_, event->head.sid, event->head.type);
       break;
     }
   }
