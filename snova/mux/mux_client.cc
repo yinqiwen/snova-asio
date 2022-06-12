@@ -118,7 +118,8 @@ asio::awaitable<void> MuxClient::CheckConnections() {
       } else {
         uint32_t now = time(nullptr);
         if (now > remote_conns_[i]->GetExpireAtUnixSecs()) {
-          SNOVA_INFO("[{}]Try to retire connection.", i);
+          SNOVA_INFO("[{}]Try to retire connection since now:{}, retire time:{}", i, now,
+                     remote_conns_[i]->GetExpireAtUnixSecs());
           auto retired_conn = remote_conns_[i];
           remote_conns_[i] = nullptr;
           auto retire_event = std::make_unique<RetireConnRequest>();

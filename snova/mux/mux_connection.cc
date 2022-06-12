@@ -51,7 +51,7 @@ MuxConnection::MuxConnection(::asio::ip::tcp::socket&& sock,
   write_buffer_.resize(kMaxChunkSize + kEventHeadSize + kReservedBufferSize);
   read_buffer_.resize(2 * kMaxChunkSize);
   g_mux_conn_num++;
-  expire_at_unix_secs_ = time(nullptr) + random_uint64(0, 60);
+  expire_at_unix_secs_ = (time(nullptr) + g_connection_expire_secs + random_uint64(0, 60));
 }
 MuxConnection::~MuxConnection() { g_mux_conn_num--; }
 
