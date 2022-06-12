@@ -46,6 +46,7 @@ class MuxStream : public Stream {
   asio::awaitable<StreamReadResult> Read() override;
   asio::awaitable<std::error_code> Write(IOBufPtr&& buf, size_t len) override;
   asio::awaitable<std::error_code> Close(bool close_by_remote) override;
+  uint32_t GetID() const override { return sid_; }
   ~MuxStream();
 
   static uint32_t NextID(bool is_client);

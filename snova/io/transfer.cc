@@ -64,7 +64,7 @@ asio::awaitable<void> transfer(StreamPtr from, SocketRef to, const TransferRouti
     auto [data, len, ec] = co_await from->Read();
     if (ec) {
       // co_await from->Close(false);
-      SNOVA_ERROR("Read ERROR  {}", ec);
+      SNOVA_ERROR("[{}]Read ERROR {}", from->GetID(), ec);
       break;
     }
     if (routine) {
@@ -83,6 +83,7 @@ asio::awaitable<void> transfer(StreamPtr from, SocketRef to, const TransferRouti
       routine();
     }
   }
+  co_await from->Close(false);
   to.close();
   co_return;
 }

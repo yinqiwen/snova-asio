@@ -209,9 +209,10 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
       break;
     }
     case EVENT_STREAM_CLOSE: {
+      SNOVA_INFO("[{}][{}]Recv stream close event.", idx_, event->head.sid);
       MuxStreamPtr stream = MuxStream::Get(event->head.sid);
       if (!stream) {
-        SNOVA_ERROR("[{}]No stream found to close.", event->head.sid);
+        SNOVA_ERROR("[{}][{}]No stream found to close.", idx_, event->head.sid);
       } else {
         co_await stream->Close(true);
       }
