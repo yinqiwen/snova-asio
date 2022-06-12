@@ -13,28 +13,26 @@ jobs:
   linux_build:
     runs-on: ubuntu-latest
     steps:
-      - run:   |
-         sudo apt update
-         sudo apt install gcc-11 g++-11
-        shell: bash
       - uses: actions/checkout@v3
       - uses: bazelbuild/setup-bazelisk@v2
-      - run: bazel build --cxxopt=-std=c++2a --cxxopt=-fcoroutines //...
-        env:
-            CC: gcc-11
-            CXX: g++-11
-      - run: tar czf snova_asio_linux_amd64.tar.gz -C ./bazel-bin/snova/app/ snova
+      - run: bazel build --cxxopt=-std=c++20 --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_x64 //...
+      - run: tar czf snova_asio_linux_musl_amd64.tar.gz -C ./bazel-bin/snova/app/ snova
+      - run: bazel clean --expunge
+      - run: bazel build --cxxopt=-std=c++20 --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_armv5l //...
+      - run: tar czf snova_asio_linux_musl_armv5l.tar.gz -C ./bazel-bin/snova/app/ snova
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: snova_asio_linux_amd64.tar.gz
+          files: |
+            snova_asio_linux_musl_amd64.tar.gz
+            snova_asio_linux_musl_armv5l.tar.gz
   windows_build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
       - uses: bazelbuild/setup-bazelisk@v2
-      - run: bazel.exe build --enable_runfiles --cxxopt=/std:c++20 --cxxopt=/O2 //...
+      - run: bazel.exe build --cxxopt=/O2 --enable_runfiles --cxxopt=/std:c++20  //...
       - run: tar czf snova_asio_windows_amd64.tar.gz -C ./bazel-bin/snova/app/ snova.exe 
       - name: Release
         uses: softprops/action-gh-release@v1

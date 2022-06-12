@@ -112,8 +112,67 @@ cc_library(
         ],
     )
 
-    native.new_local_repository(
-        name = "gcc_arm_linux_gnueabihf",
-        path = "/usr",
-        build_file = clean_dep("//:toolchains/gcc_arm_linux_gnueabihf.BUILD"),
+    _CLI11_BUILD_FILE = """
+cc_library(
+    name = "CLI11",
+    hdrs = glob([
+        "include/**",
+    ]),
+    includes=["./include"],
+    visibility = [ "//visibility:public" ],
+)
+"""
+    http_archive(
+        name = "com_github_CLIUtils_CLI11",
+        strip_prefix = "CLI11-2.2.0",
+        build_file_content = _CLI11_BUILD_FILE,
+        urls = [
+            "https://github.com/CLIUtils/CLI11/archive/refs/tags/v2.2.0.tar.gz",
+        ],
+    )
+
+    # native.new_local_repository(
+    #     name = "armv5l_linux_musleabi",
+    #     path = "/data/CppProj/armv5l-linux-musleabi-cross",
+    #     build_file = clean_dep("//:toolchains/armv5l_linux_musleabi.BUILD"),
+    # )
+
+    # native.new_local_repository(
+    #     name = "armv7l_linux_musleabihf",
+    #     path = "/data/CppProj/armv7l-linux-musleabihf-cross",
+    #     build_file = clean_dep("//:toolchains/armv7l_linux_musleabihf.BUILD"),
+    # )
+
+    # native.new_local_repository(
+    #     name = "x64_linux_musl_gcc",
+    #     path = "/data/CppProj/x86_64-linux-musl-native",
+    #     build_file = clean_dep("//:toolchains/x86_64-linux-musl.BUILD"),
+    # )
+
+    http_archive(
+        name = "armv5l_linux_musleabi",
+        strip_prefix = "armv5l-linux-musleabi-cross",
+        build_file = clean_dep("//:toolchains/armv5l_linux_musleabi.BUILD"),
+        urls = [
+            "https://more.musl.cc/11/x86_64-linux-musl/armv5l-linux-musleabi-cross.tgz",
+        ],
+    )
+
+    http_archive(
+        name = "armv7l_linux_musleabihf",
+        strip_prefix = "armv7l-linux-musleabihf-cross",
+        build_file = clean_dep("//:toolchains/x86_64-linux-musl.BUILD"),
+        urls = [
+            "https://more.musl.cc/11/x86_64-linux-musl/armv7l-linux-musleabihf-cross.tgz",
+        ],
+    )
+
+    http_archive(
+        name = "x64_linux_musl_gcc",
+        strip_prefix = "x86_64-linux-musl-native",
+        build_file = clean_dep("//:toolchains/x86_64-linux-musl.BUILD"),
+        urls = [
+            "https://more.musl.cc/11/x86_64-linux-musl/x86_64-linux-musl-native.tgz",
+        ],
+        patch_cmds = ["rm -if usr", "mkdir usr", "cp -R include usr"],
     )

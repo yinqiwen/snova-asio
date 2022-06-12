@@ -35,9 +35,8 @@
 #include "snova/mux/mux_server.h"
 #include "snova/mux/mux_stream.h"
 #include "snova/server/local_relay.h"
+#include "snova/util/flags.h"
 #include "snova/util/net_helper.h"
-
-ABSL_DECLARE_FLAG(bool, middle);
 
 namespace snova {
 using namespace asio::experimental::awaitable_operators;
@@ -57,7 +56,7 @@ asio::awaitable<void> server_relay(uint64_t client_id, std::unique_ptr<MuxEvent>
     MuxStream::Remove(local_stream_id);
   };
 
-  if (absl::GetFlag(FLAGS_middle)) {
+  if (g_is_middle_node) {
     co_await client_relay(local_stream, Bytes{}, open_request->remote_host,
                           open_request->remote_port, open_request->is_tcp);
   } else {

@@ -22,6 +22,7 @@ cc_library(
         ":mux_connection",
         "//snova/io",
         "//snova/log:log_api",
+        "//snova/util:flags",
         "//snova/util:net_helper",
         "//snova/util:stat",
         "@asio",

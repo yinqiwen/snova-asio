@@ -27,11 +27,13 @@ cc_binary(
         "//snova/server:remote_server",
         "//snova/util:misc_helper",
         "//snova/util:stat",
-        "@com_google_absl//absl/flags:config",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/flags:parse",
-        "@com_google_absl//absl/flags:usage",
+        "//snova/util:flags",
+        # "@com_google_absl//absl/flags:config",
+        # "@com_google_absl//absl/flags:flag",
+        # "@com_google_absl//absl/flags:parse",
+        # "@com_google_absl//absl/flags:usage",
         "@com_google_absl//absl/strings",
+        "@com_github_CLIUtils_CLI11//:CLI11",
     ],
 )
 

@@ -26,59 +26,15 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "snova/io/io.h"
-#include <stack>
 #include "snova/util/flags.h"
-#include "snova/util/stat.h"
 
 namespace snova {
-static std::stack<IOBuf*> g_io_bufs;
-// static constexpr uint32_t kIOBufPoolSize = 64;
-static uint64_t g_iobuf_pool_bytes = 0;
-
-void register_io_stat() {
-  register_stat_func([]() -> StatValues {
-    StatValues vals;
-    auto& kv = vals["IOBuf"];
-    kv["pool_size"] = std::to_string(g_io_bufs.size());
-    kv["pool_bytes"] = std::to_string(g_iobuf_pool_bytes);
-    return vals;
-  });
-}
-
-void IOBufDeleter::operator()(IOBuf* v) const {
-  if (g_io_bufs.size() < g_iobuf_max_pool_size) {
-    g_io_bufs.push(v);
-    g_iobuf_pool_bytes += v->capacity();
-    return;
-  }
-  delete v;
-}
-static IOBuf* get_raw_iobuf() {
-  if (g_io_bufs.empty()) {
-    return new IOBuf;
-  }
-  IOBuf* p = g_io_bufs.top();
-  g_io_bufs.pop();
-  g_iobuf_pool_bytes -= p->capacity();
-  return p;
-}
-
-IOBufPtr get_iobuf(size_t n) {
-  IOBufDeleter deleter;
-  IOBufPtr ptr(get_raw_iobuf(), deleter);
-  if (ptr->size() < n) {
-    ptr->resize(n);
-  }
-  return ptr;
-}
-IOBufSharedPtr get_shared_iobuf(size_t n) {
-  IOBufDeleter deleter;
-  IOBufSharedPtr ptr(get_raw_iobuf(), deleter);
-  if (ptr->size() < n) {
-    ptr->resize(n);
-  }
-  return ptr;
-}
+bool g_is_middle_node = false;
+bool g_is_entry_node = false;
+bool g_is_exit_node = false;
+bool g_is_redirect_node = false;
+std::string g_remote_server;
+uint32_t g_conn_num_per_server = 3;
+uint32_t g_iobuf_max_pool_size = 64;
 
 }  // namespace snova

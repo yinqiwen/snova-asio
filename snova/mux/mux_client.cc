@@ -28,16 +28,13 @@
  */
 #include "snova/mux/mux_client.h"
 #include <memory>
-#include "absl/flags/declare.h"
-#include "absl/flags/flag.h"
+
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/log/log_macros.h"
+#include "snova/util/flags.h"
 #include "snova/util/net_helper.h"
 #include "snova/util/stat.h"
 #include "spdlog/fmt/bundled/ostream.h"
-
-ABSL_DECLARE_FLAG(std::string, remote);
-ABSL_FLAG(uint32_t, conn_num_per_server, 3, "Remote server connection number per server.");
 
 namespace snova {
 std::shared_ptr<MuxClient>& MuxClient::GetInstance() {
@@ -81,8 +78,8 @@ asio::awaitable<std::error_code> MuxClient::NewConnection(uint32_t idx) {
 asio::awaitable<std::error_code> MuxClient::Init(const std::string& user,
                                                  const std::string& cipher_method,
                                                  const std::string& cipher_key) {
-  remote_conns_.resize(absl::GetFlag(FLAGS_conn_num_per_server));
-  PaserEndpointResult parse_result = parse_endpoint(absl::GetFlag(FLAGS_remote));
+  remote_conns_.resize(g_conn_num_per_server);
+  PaserEndpointResult parse_result = parse_endpoint(g_remote_server);
   if (parse_result.second) {
     co_return parse_result.second;
   }
@@ -101,7 +98,7 @@ asio::awaitable<std::error_code> MuxClient::Init(const std::string& user,
     co_return ec;
   }
 
-  for (uint32_t i = 1; i < absl::GetFlag(FLAGS_conn_num_per_server); i++) {
+  for (uint32_t i = 1; i < g_conn_num_per_server; i++) {
     co_await NewConnection(i);
   }
   auto ex = co_await asio::this_coro::executor;
@@ -115,7 +112,7 @@ asio::awaitable<void> MuxClient::CheckConnections() {
   while (true) {
     timer.expires_after(period);
     co_await timer.async_wait(::asio::use_awaitable);
-    for (uint32_t i = 0; i < absl::GetFlag(FLAGS_conn_num_per_server); i++) {
+    for (uint32_t i = 0; i < g_conn_num_per_server; i++) {
       if (!remote_conns_[i]) {
         co_await NewConnection(i);
       }
