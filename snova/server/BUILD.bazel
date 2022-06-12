@@ -53,6 +53,7 @@ cc_library(
         "//snova/mux:mux_connection",
         "//snova/mux:mux_server",
         "//snova/util:net_helper",
+        "//snova/util:time_wheel",
         "@asio",
         "@com_google_absl//absl/cleanup",
         "@com_google_absl//absl/strings",

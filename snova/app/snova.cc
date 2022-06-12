@@ -81,6 +81,8 @@ int main(int argc, char** argv) {
   app.add_option("--remote", snova::g_remote_server, "Remote server address");
   app.add_option("--conn_num_per_server", snova::g_conn_num_per_server,
                  "Remote server connection number per server.");
+  app.add_option("--conn_expire_secs", snova::g_connection_expire_secs,
+                 "Remote server connection expire seconds, default 1800s.");
   app.add_option("--max_iobuf_pool_size", snova::g_iobuf_max_pool_size, "IOBuf pool max size");
   app.add_option("--stream_io_timeout_secs", snova::g_stream_io_timeout_secs,
                  "Proxy stream IO timeout secs, default 300s");

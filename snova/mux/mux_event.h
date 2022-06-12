@@ -60,6 +60,8 @@ enum EventType {
   EVENT_STREAM_OPEN,
   EVENT_STREAM_CLOSE,
   EVENT_STREAM_CHUNK,
+  EVENT_RETIRE_CONN_REQ,
+  EVENT_RETIRE_CONN_RES,
 };
 
 struct MuxEvent {
@@ -90,6 +92,12 @@ struct AuthResponse : public MuxEvent {
   bool success;
   uint64_t iv = 0;
   AuthResponse() { head.type = EVENT_AUTH_RES; }
+  int Encode(MutableBytes& buffer) const override;
+  int Decode(const Bytes& buffer) override;
+};
+
+struct RetireConnRequest : public MuxEvent {
+  RetireConnRequest() { head.type = EVENT_RETIRE_CONN_REQ; }
   int Encode(MutableBytes& buffer) const override;
   int Decode(const Bytes& buffer) override;
 };

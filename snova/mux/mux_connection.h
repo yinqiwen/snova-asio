@@ -31,6 +31,7 @@
 #include <atomic>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
@@ -46,7 +47,9 @@
 namespace snova {
 using ServerAuthResult = std::pair<uint64_t, bool>;
 using ServerRelayFunc = std::function<asio::awaitable<void>(uint64_t, std::unique_ptr<MuxEvent>&&)>;
-
+class MuxConnection;
+using RetireCallback = std::function<void(MuxConnection*)>;
+using MuxConnectionPtr = std::shared_ptr<MuxConnection>;
 class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
  public:
   static size_t Size();
@@ -56,22 +59,30 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
   asio::awaitable<bool> ClientAuth(const std::string& user, uint64_t client_id);
   asio::awaitable<ServerAuthResult> ServerAuth();
   asio::awaitable<void> ReadEventLoop();
+  MuxConnectionPtr GetShared() { return shared_from_this(); }
 
   void SetServerRelayFunc(ServerRelayFunc&& f) { server_relay_ = std::move(f); }
+  void SetRetireCallback(RetireCallback&& f) { retire_callback_ = std::move(f); }
   void SetIdx(uint32_t idx) { idx_ = idx; }
   uint32_t GetIdx() const { return idx_; }
+  uint32_t GetExpireAtUnixSecs() const { return expire_at_unix_secs_; }
+  uint64_t GetClientId() const { return client_id_; }
+  uint32_t GetLastActiveUnixSecs() const { return last_active_unix_secs_; }
 
   ~MuxConnection();
-  asio::awaitable<bool> Write(std::unique_ptr<MuxEvent>&& write_ev);
-  void Close();
-
- private:
   template <typename T>
   asio::awaitable<bool> WriteEvent(std::unique_ptr<T>&& event) {
+    if constexpr (std::is_same_v<T, StreamCloseRequest>) {
+      SNOVA_INFO("[{}][{}]Send close to remote.", idx_, event->head.sid);
+    }
     std::unique_ptr<MuxEvent> write_ev = std::move(event);
     bool r = co_await Write(std::move(write_ev));
     co_return r;
   }
+  asio::awaitable<bool> Write(std::unique_ptr<MuxEvent>&& write_ev);
+  void Close();
+
+ private:
   std::shared_ptr<MuxConnection> GetSelf() { return shared_from_this(); }
 
   MuxStreamPtr GetStream(uint32_t sid);
@@ -88,9 +99,13 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
   Bytes readable_data_;
   uint64_t client_id_;
   uint32_t idx_;
+  uint32_t expire_at_unix_secs_;
+  uint32_t last_unmatch_stream_id_;
+  uint32_t last_active_unix_secs_;
   ServerRelayFunc server_relay_;
+  RetireCallback retire_callback_;
   bool is_local_;
   bool is_authed_;
 };
-using MuxConnectionPtr = std::shared_ptr<MuxConnection>;
+
 }  // namespace snova

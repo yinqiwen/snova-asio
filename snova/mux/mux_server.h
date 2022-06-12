@@ -42,6 +42,7 @@ class MuxServer {
 
   uint32_t Add(uint64_t client_id, MuxConnectionPtr conn);
   void Remove(uint64_t client_id, MuxConnectionPtr conn);
+  void Remove(uint64_t client_id, MuxConnection* conn);
 
   EventWriterFactory GetEventWriterFactory(uint64_t client_id);
 

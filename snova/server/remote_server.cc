@@ -39,6 +39,7 @@
 #include "snova/server/remote_relay.h"
 #include "snova/util/net_helper.h"
 #include "snova/util/stat.h"
+#include "snova/util/time_wheel.h"
 
 namespace snova {
 static uint32_t g_remote_server_conn_num = 0;
@@ -55,6 +56,23 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock, std::st
     co_return;
   }
   mux_conn->SetServerRelayFunc(server_relay);
+  mux_conn->SetRetireCallback([](MuxConnection* c) {
+    SNOVA_INFO("[{}]Connection retired!", c->GetIdx());
+    MuxServer::GetInstance()->Remove(c->GetClientId(), c);
+    auto retired_conn = c->GetShared();
+    TimerTask timer_task;
+    timer_task.timeout_callback = [retired_conn]() -> asio::awaitable<void> {
+      SNOVA_ERROR("[{}]Close retired connection since it's not active since {}s ago.",
+                  retired_conn->GetIdx(), time(nullptr) - retired_conn->GetLastActiveUnixSecs());
+      retired_conn->Close();
+      co_return;
+    };
+    timer_task.get_active_time = [retired_conn]() -> uint32_t {
+      return retired_conn->GetLastActiveUnixSecs();
+    };
+    timer_task.timeout_secs = 60;
+    TimeWheel::GetInstance()->Register(std::move(timer_task));
+  });
   uint32_t idx = MuxServer::GetInstance()->Add(client_id, mux_conn);
   mux_conn->SetIdx(idx);
   auto ex = co_await asio::this_coro::executor;

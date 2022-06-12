@@ -62,7 +62,10 @@ MuxStreamPtr MuxStream::Get(uint32_t sid) {
   }
   return found->second;
 }
-void MuxStream::Remove(uint32_t sid) { g_streams.erase(sid); }
+void MuxStream::Remove(uint32_t sid) {
+  g_streams.erase(sid);
+  SNOVA_INFO("[{}]Remove stream.", sid);
+}
 
 MuxStream::MuxStream(EventWriterFactory&& factory, StreamDataChannelExecutor& ex, uint32_t sid)
     : event_writer_factory_(std::move(factory)),

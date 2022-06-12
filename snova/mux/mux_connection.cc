@@ -27,8 +27,8 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/mux/mux_connection.h"
-// #include "absl/random/random.h"
 #include "asio/experimental/as_tuple.hpp"
+#include "snova/util/flags.h"
 #include "snova/util/misc_helper.h"
 #include "spdlog/fmt/bundled/ostream.h"
 
@@ -43,11 +43,15 @@ MuxConnection::MuxConnection(::asio::ip::tcp::socket&& sock,
       cipher_ctx_(std::move(cipher_ctx)),
       client_id_(0),
       idx_(0),
+      expire_at_unix_secs_(0),
+      last_unmatch_stream_id_(0),
+      last_active_unix_secs_(0),
       is_local_(is_local),
       is_authed_(false) {
   write_buffer_.resize(kMaxChunkSize + kEventHeadSize + kReservedBufferSize);
   read_buffer_.resize(2 * kMaxChunkSize);
   g_mux_conn_num++;
+  expire_at_unix_secs_ = time(nullptr) + random_uint64(0, 60);
 }
 MuxConnection::~MuxConnection() { g_mux_conn_num--; }
 
@@ -181,6 +185,13 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
   }
   // SNOVA_INFO("[{}]Recv event:{}", event->head.sid, event->head.type);
   switch (event->head.type) {
+    case EVENT_RETIRE_CONN_REQ: {
+      SNOVA_INFO("[{}]Recv retired request.", idx_);
+      if (retire_callback_) {
+        retire_callback_(this);
+      }
+      break;
+    }
     case EVENT_STREAM_OPEN: {
       StreamOpenRequest* open_request = dynamic_cast<StreamOpenRequest*>(event.get());
       if (nullptr == open_request) {
@@ -210,6 +221,13 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
       MuxStreamPtr stream = MuxStream::Get(event->head.sid);
       if (!stream) {
         SNOVA_ERROR("[{}][{}]No stream found to handle chunk.", idx_, event->head.sid);
+        if (last_unmatch_stream_id_ != event->head.sid) {
+          SNOVA_ERROR("[{}][{}]Force close remote stream.", idx_, event->head.sid);
+          last_unmatch_stream_id_ = event->head.sid;
+          auto close_ev = std::make_unique<StreamCloseRequest>();
+          close_ev->head.sid = event->head.sid;
+          co_await WriteEvent(std::move(close_ev));
+        }
       } else {
         StreamChunk* chunk = dynamic_cast<StreamChunk*>(event.get());
         if (nullptr == chunk) {
@@ -236,6 +254,7 @@ asio::awaitable<void> MuxConnection::ReadEventLoop() {
     if (0 != rc && ERR_NEED_MORE_INPUT_DATA != rc) {
       break;
     }
+    last_active_unix_secs_ = time(nullptr);
   }
   Close();
   g_mux_conn_num_in_loop--;
@@ -246,6 +265,7 @@ void MuxConnection::Close() { socket_.close(); }
 
 asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev) {
   // SNOVA_INFO("[{}]Write event:{}", write_ev->head.sid, write_ev->head.type);
+  last_active_unix_secs_ = time(nullptr);
   MutableBytes wbuffer(write_buffer_.data(), write_buffer_.size());
   int rc = cipher_ctx_->Encrypt(write_ev, wbuffer);
   if (0 != rc) {

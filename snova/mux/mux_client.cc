@@ -34,6 +34,7 @@
 #include "snova/util/flags.h"
 #include "snova/util/net_helper.h"
 #include "snova/util/stat.h"
+#include "snova/util/time_wheel.h"
 
 namespace snova {
 std::shared_ptr<MuxClient>& MuxClient::GetInstance() {
@@ -114,6 +115,28 @@ asio::awaitable<void> MuxClient::CheckConnections() {
     for (uint32_t i = 0; i < g_conn_num_per_server; i++) {
       if (!remote_conns_[i]) {
         co_await NewConnection(i);
+      } else {
+        uint32_t now = time(nullptr);
+        if (now > remote_conns_[i]->GetExpireAtUnixSecs()) {
+          SNOVA_INFO("[{}]Connection expired!", i);
+          auto retired_conn = remote_conns_[i];
+          auto retire_event = std::make_unique<RetireConnRequest>();
+          co_await retired_conn->WriteEvent(std::move(retire_event));
+          TimerTask timer_task;
+          timer_task.timeout_callback = [retired_conn]() -> asio::awaitable<void> {
+            SNOVA_ERROR("[{}]Close retired connection since it's not active since {}s ago.",
+                        retired_conn->GetIdx(),
+                        time(nullptr) - retired_conn->GetLastActiveUnixSecs());
+            retired_conn->Close();
+            co_return;
+          };
+          timer_task.get_active_time = [retired_conn]() -> uint32_t {
+            return retired_conn->GetLastActiveUnixSecs();
+          };
+          timer_task.timeout_secs = 60;
+          TimeWheel::GetInstance()->Register(std::move(timer_task));
+          remote_conns_[i] = nullptr;
+        }
       }
     }
   }

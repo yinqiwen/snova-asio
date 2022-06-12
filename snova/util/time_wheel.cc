@@ -94,7 +94,9 @@ asio::awaitable<void> TimeWheel::Run() {
           }
         }
         TimerTaskID new_id{next_idx, time_wheel_[next_idx].size()};
-        task.id_update_cb(new_id);
+        if (task.id_update_cb) {
+          task.id_update_cb(new_id);
+        }
         time_wheel_[next_idx].emplace_back(std::move(task));
       }
     }

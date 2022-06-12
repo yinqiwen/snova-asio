@@ -43,7 +43,8 @@ EventWriterFactory MuxServer::GetEventWriterFactory(uint64_t client_id) {
     auto& conns = found->second;
     size_t check_count = 0;
     while (check_count < conns.size()) {
-      auto conn = conns[select_cursor % conns.size()];
+      uint32_t conn_idx = select_cursor % conns.size();
+      auto conn = conns[conn_idx];
       select_cursor++;
       check_count++;
       if (conn) {
@@ -68,7 +69,7 @@ uint32_t MuxServer::Add(uint64_t client_id, MuxConnectionPtr conn) {
   conns.emplace_back(conn);
   return conns.size() - 1;
 }
-void MuxServer::Remove(uint64_t client_id, MuxConnectionPtr conn) {
+void MuxServer::Remove(uint64_t client_id, MuxConnection* conn) {
   auto found = mux_conns_.find(client_id);
   if (found == mux_conns_.end()) {
     return;
@@ -76,7 +77,7 @@ void MuxServer::Remove(uint64_t client_id, MuxConnectionPtr conn) {
   bool all_empty = true;
   bool match = false;
   for (auto& c : found->second) {
-    if (c.get() == conn.get()) {
+    if (c.get() == conn) {
       c = nullptr;
       match = true;
     }
@@ -91,4 +92,5 @@ void MuxServer::Remove(uint64_t client_id, MuxConnectionPtr conn) {
     mux_conns_.erase(found);
   }
 }
+void MuxServer::Remove(uint64_t client_id, MuxConnectionPtr conn) { Remove(client_id, conn.get()); }
 }  // namespace snova

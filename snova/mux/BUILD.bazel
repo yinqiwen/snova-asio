@@ -25,6 +25,7 @@ cc_library(
         "//snova/util:flags",
         "//snova/util:net_helper",
         "//snova/util:stat",
+        "//snova/util:time_wheel",
         "@asio",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
