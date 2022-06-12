@@ -64,6 +64,7 @@ void TimeWheel::Cancel(const TimerTaskID& id) {
   }
   queue[id.second].timeout_callback = {};
   queue[id.second].get_active_time = {};
+  queue[id.second].id_update_cb = {};
   queue[id.second].canceled = true;
 }
 
@@ -92,6 +93,8 @@ asio::awaitable<void> TimeWheel::Run() {
             next_idx--;
           }
         }
+        TimerTaskID new_id{next_idx, time_wheel_[next_idx].size()};
+        task.id_update_cb(new_id);
         time_wheel_[next_idx].emplace_back(std::move(task));
       }
     }

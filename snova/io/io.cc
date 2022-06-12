@@ -35,6 +35,8 @@ namespace snova {
 static std::stack<IOBuf*> g_io_bufs;
 // static constexpr uint32_t kIOBufPoolSize = 64;
 static uint64_t g_iobuf_pool_bytes = 0;
+static uint64_t g_active_iobuf_bytes = 0;
+static uint32_t g_active_iobuf_num = 0;
 
 void register_io_stat() {
   register_stat_func([]() -> StatValues {
@@ -42,11 +44,15 @@ void register_io_stat() {
     auto& kv = vals["IOBuf"];
     kv["pool_size"] = std::to_string(g_io_bufs.size());
     kv["pool_bytes"] = std::to_string(g_iobuf_pool_bytes);
+    kv["active_iobuf_num"] = std::to_string(g_active_iobuf_num);
+    kv["active_iobuf_bytes"] = std::to_string(g_active_iobuf_bytes);
     return vals;
   });
 }
 
 void IOBufDeleter::operator()(IOBuf* v) const {
+  g_active_iobuf_num--;
+  g_active_iobuf_bytes -= v->capacity();
   if (g_io_bufs.size() < g_iobuf_max_pool_size) {
     g_io_bufs.push(v);
     g_iobuf_pool_bytes += v->capacity();
@@ -54,30 +60,31 @@ void IOBufDeleter::operator()(IOBuf* v) const {
   }
   delete v;
 }
-static IOBuf* get_raw_iobuf() {
+static IOBuf* get_raw_iobuf(size_t n) {
+  IOBuf* p = nullptr;
   if (g_io_bufs.empty()) {
-    return new IOBuf;
+    p = new IOBuf;
+  } else {
+    p = g_io_bufs.top();
+    g_io_bufs.pop();
   }
-  IOBuf* p = g_io_bufs.top();
-  g_io_bufs.pop();
+  if (p->size() < n) {
+    p->resize(n);
+  }
   g_iobuf_pool_bytes -= p->capacity();
+  g_active_iobuf_num++;
+  g_active_iobuf_bytes += p->capacity();
   return p;
 }
 
 IOBufPtr get_iobuf(size_t n) {
   IOBufDeleter deleter;
-  IOBufPtr ptr(get_raw_iobuf(), deleter);
-  if (ptr->size() < n) {
-    ptr->resize(n);
-  }
+  IOBufPtr ptr(get_raw_iobuf(n), deleter);
   return ptr;
 }
 IOBufSharedPtr get_shared_iobuf(size_t n) {
   IOBufDeleter deleter;
-  IOBufSharedPtr ptr(get_raw_iobuf(), deleter);
-  if (ptr->size() < n) {
-    ptr->resize(n);
-  }
+  IOBufSharedPtr ptr(get_raw_iobuf(n), deleter);
   return ptr;
 }
 

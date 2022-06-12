@@ -37,9 +37,11 @@ namespace snova {
 using TimeoutFunc = std::function<asio::awaitable<void>()>;
 using GetActiveTimeFunc = std::function<uint32_t()>;
 using TimerTaskID = std::pair<uint32_t, uint32_t>;
+using IDUpdateFunc = std::function<void(TimerTaskID&)>;
 struct TimerTask {
   TimeoutFunc timeout_callback;
   GetActiveTimeFunc get_active_time;
+  IDUpdateFunc id_update_cb;
   uint32_t timeout_secs = 0;
   bool canceled = false;
 };

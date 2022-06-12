@@ -86,6 +86,7 @@ static asio::awaitable<void> do_client_relay(T& local_stream, const Bytes& reade
       co_return;
     };
     timer_task.get_active_time = [&]() -> uint32_t { return latest_io_time; };
+    timer_task.id_update_cb = [&](TimerTaskID& id) { transfer_timeout_task_id = id; };
     timer_task.timeout_secs = g_stream_io_timeout_secs;
     transfer_timeout_task_id = TimeWheel::GetInstance()->Register(std::move(timer_task));
   }
