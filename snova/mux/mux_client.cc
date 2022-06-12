@@ -118,8 +118,9 @@ asio::awaitable<void> MuxClient::CheckConnections() {
       } else {
         uint32_t now = time(nullptr);
         if (now > remote_conns_[i]->GetExpireAtUnixSecs()) {
-          SNOVA_INFO("[{}]Connection expired!", i);
+          SNOVA_INFO("[{}]Try to retire connection.", i);
           auto retired_conn = remote_conns_[i];
+          remote_conns_[i] = nullptr;
           auto retire_event = std::make_unique<RetireConnRequest>();
           co_await retired_conn->WriteEvent(std::move(retire_event));
           TimerTask timer_task;
@@ -135,7 +136,6 @@ asio::awaitable<void> MuxClient::CheckConnections() {
           };
           timer_task.timeout_secs = 60;
           TimeWheel::GetInstance()->Register(std::move(timer_task));
-          remote_conns_[i] = nullptr;
         }
       }
     }

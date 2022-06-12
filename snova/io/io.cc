@@ -62,19 +62,15 @@ void IOBufDeleter::operator()(IOBuf* v) const {
 }
 static IOBuf* get_raw_iobuf(size_t n) {
   IOBuf* p = nullptr;
-  bool fetch_from_pool = false;
   if (g_io_bufs.empty()) {
     p = new IOBuf;
   } else {
     p = g_io_bufs.top();
     g_io_bufs.pop();
-    fetch_from_pool = true;
+    g_iobuf_pool_bytes -= p->capacity();
   }
   if (p->size() < n) {
     p->resize(n);
-  }
-  if (fetch_from_pool) {
-    g_iobuf_pool_bytes -= p->capacity();
   }
   g_active_iobuf_num++;
   g_active_iobuf_bytes += p->capacity();
