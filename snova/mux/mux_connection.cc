@@ -47,7 +47,8 @@ MuxConnection::MuxConnection(::asio::ip::tcp::socket&& sock,
       last_unmatch_stream_id_(0),
       last_active_unix_secs_(0),
       is_local_(is_local),
-      is_authed_(false) {
+      is_authed_(false),
+      retired_(false) {
   write_buffer_.resize(kMaxChunkSize + kEventHeadSize + kReservedBufferSize);
   read_buffer_.resize(2 * kMaxChunkSize);
   g_mux_conn_num++;
@@ -187,6 +188,7 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
   switch (event->head.type) {
     case EVENT_RETIRE_CONN_REQ: {
       SNOVA_INFO("[{}]Recv retired request.", idx_);
+      retired_ = true;
       if (retire_callback_) {
         retire_callback_(this);
       }
@@ -259,7 +261,7 @@ asio::awaitable<void> MuxConnection::ReadEventLoop() {
   }
   Close();
   g_mux_conn_num_in_loop--;
-  SNOVA_INFO("Close mux connection:{}", idx_);
+  SNOVA_INFO("Close mux connection:{}, retired:{}", idx_, retired_);
 }
 
 void MuxConnection::Close() { socket_.close(); }

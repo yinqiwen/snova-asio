@@ -122,10 +122,10 @@ asio::awaitable<std::error_code> MuxStream::Write(IOBufPtr&& buf, size_t len) {
   co_return std::error_code{};
 }
 asio::awaitable<std::error_code> MuxStream::Close(bool close_by_remote) {
-  SNOVA_INFO("[{}]Close from remote peer:{}", sid_, close_by_remote);
   if (is_remote_closed_) {
     co_return std::error_code{};
   }
+  SNOVA_INFO("[{}]Close from remote peer:{}", sid_, close_by_remote);
   data_channel_.close();
   is_remote_closed_ = true;
   if (close_by_remote) {

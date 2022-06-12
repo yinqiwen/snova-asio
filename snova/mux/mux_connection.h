@@ -68,6 +68,8 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
   uint32_t GetExpireAtUnixSecs() const { return expire_at_unix_secs_; }
   uint64_t GetClientId() const { return client_id_; }
   uint32_t GetLastActiveUnixSecs() const { return last_active_unix_secs_; }
+  bool IsRetired() const { return retired_; }
+  void SetRetired() { retired_ = true; }
 
   ~MuxConnection();
   template <typename T>
@@ -106,6 +108,7 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
   RetireCallback retire_callback_;
   bool is_local_;
   bool is_authed_;
+  bool retired_;
 };
 
 }  // namespace snova

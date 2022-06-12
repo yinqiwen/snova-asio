@@ -68,7 +68,9 @@ asio::awaitable<std::error_code> MuxClient::NewConnection(uint32_t idx) {
       ex,
       [this, idx, conn]() -> asio::awaitable<void> {
         co_await conn->ReadEventLoop();
-        remote_conns_[idx] = nullptr;
+        if (!conn->IsRetired()) {
+          remote_conns_[idx] = nullptr;
+        }
         co_return;
       },
       ::asio::detached);
