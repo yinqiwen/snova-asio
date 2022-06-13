@@ -184,7 +184,6 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
   if (0 != rc) {
     co_return rc;
   }
-  // SNOVA_INFO("[{}]Recv event:{}", event->head.sid, event->head.type);
   switch (event->head.type) {
     case EVENT_RETIRE_CONN_REQ: {
       SNOVA_INFO("[{}]Recv retired request.", idx_);
@@ -214,7 +213,7 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
       SNOVA_INFO("[{}][{}]Recv stream close event.", idx_, event->head.sid);
       MuxStreamPtr stream = MuxStream::Get(event->head.sid);
       if (!stream) {
-        SNOVA_ERROR("[{}][{}]No stream found to close.", idx_, event->head.sid);
+        // SNOVA_ERROR("[{}][{}]No stream found to close.", idx_, event->head.sid);
       } else {
         co_await stream->Close(true);
       }
@@ -223,8 +222,9 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
     case EVENT_STREAM_CHUNK: {
       MuxStreamPtr stream = MuxStream::Get(event->head.sid);
       if (!stream) {
-        SNOVA_ERROR("[{}][{}]No stream found to handle chunk.", idx_, event->head.sid);
         if (last_unmatch_stream_id_ != event->head.sid) {
+          SNOVA_ERROR("[{}][{}]No stream found to handle chunk with len:{}", idx_, event->head.sid,
+                      event->head.len);
           SNOVA_ERROR("[{}][{}]Force close remote stream.", idx_, event->head.sid);
           last_unmatch_stream_id_ = event->head.sid;
           auto close_ev = std::make_unique<StreamCloseRequest>();

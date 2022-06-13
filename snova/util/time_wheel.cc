@@ -77,7 +77,11 @@ asio::awaitable<void> TimeWheel::Run() {
     co_await timer.async_wait(::asio::experimental::as_tuple(::asio::use_awaitable));
     uint32_t now = time(nullptr);
     uint32_t idx = now % time_wheel_.size();
-    for (auto& task : time_wheel_[idx]) {
+    if (time_wheel_[idx].empty()) {
+      continue;
+    }
+    TimerTaskQueue routine_queue = std::move(time_wheel_[idx]);
+    for (auto& task : routine_queue) {
       if (task.canceled) {
         continue;
       }
@@ -85,14 +89,7 @@ asio::awaitable<void> TimeWheel::Run() {
       if (now - active_time > task.timeout_secs) {
         co_await task.timeout_callback();
       } else {
-        uint32_t next_idx = ((active_time + task.timeout_secs) % time_wheel_.size());
-        if (next_idx == idx) {
-          if (next_idx == 0) {
-            next_idx = time_wheel_.size() - 1;
-          } else {
-            next_idx--;
-          }
-        }
+        uint32_t next_idx = ((active_time + task.timeout_secs + 1) % time_wheel_.size());
         TimerTaskID new_id{next_idx, time_wheel_[next_idx].size()};
         if (task.id_update_cb) {
           task.id_update_cb(new_id);
@@ -100,8 +97,6 @@ asio::awaitable<void> TimeWheel::Run() {
         time_wheel_[next_idx].emplace_back(std::move(task));
       }
     }
-    time_wheel_[idx].clear();
-    time_wheel_[idx].shrink_to_fit();
   }
 }
 }  // namespace snova

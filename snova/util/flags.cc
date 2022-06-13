@@ -36,7 +36,7 @@ bool g_is_redirect_node = false;
 std::string g_remote_server;
 uint32_t g_conn_num_per_server = 5;
 uint32_t g_iobuf_max_pool_size = 64;
-uint32_t g_stream_io_timeout_secs = 600;
+uint32_t g_stream_io_timeout_secs = 120;
 uint32_t g_connection_expire_secs = 1800;
 
 }  // namespace snova
