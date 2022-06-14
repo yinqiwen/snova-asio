@@ -30,9 +30,13 @@
 #pragma once
 #include "asio.hpp"
 #include "snova/io/io.h"
+#include "snova/mux/mux_stream.h"
 
 namespace snova {
 asio::awaitable<void> client_relay(::asio::ip::tcp::socket&& sock, const Bytes& readed_data,
                                    const std::string& remote_host, uint16_t remote_port,
                                    bool is_tcp);
-}
+asio::awaitable<void> client_relay(StreamPtr stream, const Bytes& readed_data,
+                                   const std::string& remote_host, uint16_t remote_port,
+                                   bool is_tcp);
+}  // namespace snova

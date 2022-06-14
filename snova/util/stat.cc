@@ -26,23 +26,56 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <string>
+#include "snova/util/stat.h"
+#include <chrono>
 #include <vector>
-#include "absl/flags/flag.h"
-#include "absl/flags/parse.h"
+#include "absl/container/btree_map.h"
+#include "absl/container/btree_set.h"
 #include "snova/log/log_macros.h"
-#include "snova/server/remote_server.h"
-ABSL_FLAG(std::string, listen, "127.0.0.1:48101", "Listen address");
-ABSL_FLAG(std::string, cipher_method, "chacha20_poly1305", "Cipher method");
-ABSL_FLAG(std::string, cipher_key, "default cipher key", "Cipher key");
-int main(int argc, char** argv) {
-  absl::ParseCommandLine(argc, argv);
-  ::asio::io_context ctx;
-  std::string listen = absl::GetFlag(FLAGS_listen);
-  std::string cipher_method = absl::GetFlag(FLAGS_cipher_method);
-  std::string cipher_key = absl::GetFlag(FLAGS_cipher_key);
-  ::asio::co_spawn(ctx, snova::start_remote_server(listen, cipher_method, cipher_key),
-                   ::asio::detached);
-  ctx.run();
-  return 0;
+
+namespace snova {
+using StatMap = absl::btree_map<std::string, std::string>;
+using StatTable = absl::btree_map<std::string, StatMap>;
+
+static StatTable g_stat_table;
+static std::vector<CollectStatFunc> g_stat_funcs;
+
+void register_stat_func(CollectStatFunc&& func) { g_stat_funcs.emplace_back(std::move(func)); }
+
+static void print_stats() {
+  g_stat_table.clear();
+  for (auto& f : g_stat_funcs) {
+    auto stat_vals = f();
+    for (const auto& [sec, kvs] : stat_vals) {
+      for (const auto& [k, v] : kvs) {
+        g_stat_table[sec][k] = v;
+      }
+    }
+  }
+  if (g_stat_table.empty()) {
+    return;
+  }
+  std::string buffer;
+  buffer.append("======================Stats=====================\n");
+  for (const auto& [section, map] : g_stat_table) {
+    buffer.append("[").append(section).append("]:\n");
+    for (const auto& [key, value] : map) {
+      buffer.append("  ").append(key).append(": ").append(value).append("\n");
+    }
+    buffer.append("\n");
+  }
+  SNOVA_INFO("{}", buffer);
 }
+asio::awaitable<void> start_stat_timer(uint32_t period_secs) {
+  auto ex = co_await asio::this_coro::executor;
+  ::asio::steady_timer timer(ex);
+  std::chrono::seconds period(period_secs);
+  while (true) {
+    timer.expires_after(period);
+    co_await timer.async_wait(::asio::use_awaitable);
+    print_stats();
+  }
+  co_return;
+}
+
+}  // namespace snova

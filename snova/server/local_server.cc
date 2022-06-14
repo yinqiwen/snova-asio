@@ -30,16 +30,36 @@
 #include <string_view>
 #include <system_error>
 
+#include "absl/cleanup/cleanup.h"
+#include "absl/flags/declare.h"
+#include "absl/flags/flag.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_split.h"
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/log/log_macros.h"
+#include "snova/server/local_relay.h"
+#include "snova/util/flags.h"
 #include "snova/util/net_helper.h"
+#include "snova/util/stat.h"
+#include "spdlog/fmt/bundled/ostream.h"
 
 namespace snova {
+static uint32_t g_local_proxy_conn_num = 0;
+
 static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
+  g_local_proxy_conn_num++;
+  absl::Cleanup source_closer = [] { g_local_proxy_conn_num--; };
+  std::unique_ptr<::asio::ip::tcp::endpoint> remote_endpoint;
+  if (g_is_entry_node && g_is_redirect_node) {
+    remote_endpoint = std::make_unique<::asio::ip::tcp::endpoint>();
+    if (0 != get_orig_dst(sock.native_handle(), *remote_endpoint)) {
+      remote_endpoint.release();
+    }
+  }
+
   IOBufPtr buffer = get_iobuf(kMaxChunkSize);
   auto [ec, n] =
-      co_await sock.async_read_some(::asio::buffer(buffer->data(), buffer->size()),
+      co_await sock.async_read_some(::asio::buffer(buffer->data(), kMaxChunkSize),
                                     ::asio::experimental::as_tuple(::asio::use_awaitable));
   if (ec) {
     co_return;
@@ -52,9 +72,10 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
     co_return;
   }
   Bytes readable(buffer->data(), n);
-  if ((*buffer)[0] == 5) {  // socks5
+  absl::string_view cmd3((const char*)(readable.data()), 3);
+  if (!g_is_redirect_node && (*buffer)[0] == 5) {  // socks5
     co_await handle_socks5_connection(std::move(sock), std::move(buffer), readable);
-  } else if ((*buffer)[0] == 4) {  // socks4
+  } else if (!g_is_redirect_node && (*buffer)[0] == 4) {  // socks4
     SNOVA_ERROR("Socks4 not supported!");
     co_return;
   } else if ((*buffer)[0] == 0x16) {  // tls
@@ -65,8 +86,21 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
       co_return;
     }
     co_await handle_tls_connection(std::move(sock), std::move(buffer), readable);
-  } else {  // http
+  } else if (absl::EqualsIgnoreCase(cmd3, "GET") || absl::EqualsIgnoreCase(cmd3, "CON") ||
+             absl::EqualsIgnoreCase(cmd3, "PUT") || absl::EqualsIgnoreCase(cmd3, "POS") ||
+             absl::EqualsIgnoreCase(cmd3, "DEL") || absl::EqualsIgnoreCase(cmd3, "OPT") ||
+             absl::EqualsIgnoreCase(cmd3, "TRA") || absl::EqualsIgnoreCase(cmd3, "PAT") ||
+             absl::EqualsIgnoreCase(cmd3, "HEA") || absl::EqualsIgnoreCase(cmd3, "UPG")) {
     co_await handle_http_connection(std::move(sock), std::move(buffer), readable);
+  } else {  // other
+    if (remote_endpoint) {
+      // just relay to remote
+      SNOVA_INFO("Redirect proxy connection to {}.", *remote_endpoint);
+      co_await client_relay(std::move(sock), readable, remote_endpoint->address().to_string(),
+                            remote_endpoint->port(), true);
+    } else {
+      // no remote host&port to relay
+    }
   }
   co_return;
 }
@@ -91,6 +125,12 @@ asio::awaitable<std::error_code> start_local_server(const std::string& addr) {
   if (parse_result.second) {
     co_return parse_result.second;
   }
+  register_stat_func([]() -> StatValues {
+    StatValues vals;
+    auto& kv = vals["LocalServer"];
+    kv["local_proxy_conn_num"] = std::to_string(g_local_proxy_conn_num);
+    return vals;
+  });
 
   auto ex = co_await asio::this_coro::executor;
   ::asio::ip::tcp::endpoint& endpoint = *parse_result.first;

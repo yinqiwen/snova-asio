@@ -26,23 +26,36 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include "snova/io/read_until.h"
+#include "asio/experimental/as_tuple.hpp"
+#include "snova/log/log_macros.h"
+#include "spdlog/fmt/bundled/ostream.h"
 
-#pragma once
-#include <string>
-#include <system_error>
-#include <vector>
-
-#include "asio.hpp"
-#include "asio/experimental/awaitable_operators.hpp"
-#include "snova/io/io.h"
 namespace snova {
-asio::awaitable<std::error_code> start_local_server(const std::string& addr);
-
-asio::awaitable<void> handle_socks5_connection(::asio::ip::tcp::socket&& sock,
-                                               IOBufPtr&& read_buffer, Bytes& readable_data);
-asio::awaitable<void> handle_tls_connection(::asio::ip::tcp::socket&& sock, IOBufPtr&& read_buffer,
-                                            Bytes& readable_data);
-asio::awaitable<void> handle_http_connection(::asio::ip::tcp::socket&& sock, IOBufPtr&& read_buffer,
-                                             Bytes& readable_data);
-
+asio::awaitable<int> read_until(::asio::ip::tcp::socket& socket, IOBuf& buf, size_t& readed_len,
+                                std::string_view until) {
+  int rc = 0;
+  while (true) {
+    std::string_view readed_view((const char*)buf.data(), readed_len);
+    auto pos = readed_view.find(until);
+    if (pos != std::string_view::npos) {
+      co_return pos;
+    }
+    size_t rest = buf.size() - readed_len;
+    if (rest < until.size()) {
+      buf.resize(buf.size() * 2);
+    }
+    auto [ec, n] = co_await socket.async_read_some(
+        ::asio::buffer(buf.data() + readed_len, buf.size() - readed_len),
+        ::asio::experimental::as_tuple(::asio::use_awaitable));
+    if (n > 0) {
+      readed_len += n;
+    } else {
+      SNOVA_ERROR("read socket error:{} with n:{}", ec, n);
+      rc = -1;
+      break;
+    }
+  }
+  co_return rc;
+}
 }  // namespace snova

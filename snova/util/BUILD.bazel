@@ -9,6 +9,54 @@ package(
 )
 
 cc_library(
+    name = "time_wheel",
+    srcs = [
+        "time_wheel.cc",
+    ],
+    hdrs = [
+        "time_wheel.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        ":flags",
+        "//snova/log:log_api",
+        "@asio",
+    ],
+)
+
+cc_library(
+    name = "stat",
+    srcs = [
+        "stat.cc",
+    ],
+    hdrs = [
+        "stat.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        "//snova/log:log_api",
+        "@asio",
+        "@com_google_absl//absl/container:btree",
+    ],
+)
+
+cc_library(
+    name = "flags",
+    srcs = [
+        "flags.cc",
+    ],
+    hdrs = [
+        "flags.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        "//snova/log:log_api",
+        "@asio",
+        "@com_google_absl//absl/container:btree",
+    ],
+)
+
+cc_library(
     name = "net_helper",
     srcs = [
         "net_helper.cc",
@@ -18,6 +66,8 @@ cc_library(
     ],
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
+        "//snova/io:read_until",
+        "//snova/log:log_api",
         "@asio",
         "@com_google_absl//absl/strings",
     ],
@@ -46,4 +96,29 @@ cc_library(
     deps = [
         "@com_google_absl//absl/base:endian",
     ],
+)
+
+cc_library(
+    name = "http_helper",
+    srcs = [
+        "http_helper.cc",
+    ],
+    hdrs = [
+        "http_helper.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "misc_helper",
+    srcs = [
+        "misc_helper.cc",
+    ],
+    hdrs = [
+        "misc_helper.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
 )

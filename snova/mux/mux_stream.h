@@ -46,12 +46,16 @@ class MuxStream : public Stream {
   asio::awaitable<StreamReadResult> Read() override;
   asio::awaitable<std::error_code> Write(IOBufPtr&& buf, size_t len) override;
   asio::awaitable<std::error_code> Close(bool close_by_remote) override;
+  uint32_t GetID() const override { return sid_; }
   ~MuxStream();
 
   static uint32_t NextID(bool is_client);
   static MuxStreamPtr New(EventWriterFactory&& factory, StreamDataChannelExecutor& ex,
-                          uint32_t sid);
-  static MuxStreamPtr Get(uint32_t sid);
+                          uint64_t client_id, uint32_t sid);
+  static MuxStreamPtr Get(uint64_t client_id, uint32_t sid);
+  static void Remove(uint64_t client_id, uint32_t sid);
+  static size_t Size();
+  static size_t ActiveSize();
 
  private:
   MuxStream(EventWriterFactory&& factory, StreamDataChannelExecutor& ex, uint32_t sid);

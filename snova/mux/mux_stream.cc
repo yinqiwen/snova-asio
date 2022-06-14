@@ -34,10 +34,26 @@
 #include "snova/log/log_macros.h"
 #include "spdlog/fmt/bundled/ostream.h"
 namespace snova {
-using MuxStreamTable = absl::flat_hash_map<uint32_t, MuxStreamPtr>;
+
+struct ClientStreamID {
+  uint64_t client_id = 0;
+  uint32_t sid = 0;
+  bool operator==(const ClientStreamID& other) const {
+    return client_id == other.client_id && sid == other.sid;
+  }
+};
+struct ClientStreamIDHasher {
+  std::size_t operator()(const ClientStreamID& k) const { return k.client_id + k.sid; }
+};
+
+using MuxStreamTable = absl::flat_hash_map<ClientStreamID, MuxStreamPtr, ClientStreamIDHasher>;
 static MuxStreamTable g_streams;
+static uint32_t g_active_stream_size = 0;
 static std::atomic<uint32_t> g_client_sid{1};
 static std::atomic<uint32_t> g_server_sid{2};
+
+size_t MuxStream::Size() { return g_streams.size(); }
+size_t MuxStream::ActiveSize() { return g_active_stream_size; }
 
 uint32_t MuxStream::NextID(bool is_client) {
   if (is_client) {
@@ -46,27 +62,35 @@ uint32_t MuxStream::NextID(bool is_client) {
   return g_server_sid.fetch_add(2);
 }
 MuxStreamPtr MuxStream::New(EventWriterFactory&& factory, StreamDataChannelExecutor& ex,
-                            uint32_t sid) {
+                            uint64_t client_id, uint32_t sid) {
   MuxStreamPtr p(new MuxStream(std::move(factory), ex, sid));
-  g_streams.emplace(sid, p);
+  ClientStreamID id{client_id, sid};
+  g_streams.emplace(id, p);
   return p;
 }
-MuxStreamPtr MuxStream::Get(uint32_t sid) {
-  auto found = g_streams.find(sid);
+MuxStreamPtr MuxStream::Get(uint64_t client_id, uint32_t sid) {
+  ClientStreamID id{client_id, sid};
+  auto found = g_streams.find(id);
   if (found == g_streams.end()) {
     return nullptr;
   }
   return found->second;
 }
+void MuxStream::Remove(uint64_t client_id, uint32_t sid) {
+  ClientStreamID id{client_id, sid};
+  g_streams.erase(id);
+  SNOVA_INFO("[{}]Remove stream.", sid);
+}
 
 MuxStream::MuxStream(EventWriterFactory&& factory, StreamDataChannelExecutor& ex, uint32_t sid)
     : event_writer_factory_(std::move(factory)),
-      data_channel_(ex, 32),
+      data_channel_(ex, 1),
       sid_(sid),
       is_remote_closed_(false) {
   event_writer_ = event_writer_factory_();
+  g_active_stream_size++;
 }
-MuxStream::~MuxStream() { g_streams.erase(sid_); }
+MuxStream::~MuxStream() { g_active_stream_size--; }
 
 asio::awaitable<std::error_code> MuxStream::Open(const std::string& host, uint16_t port,
                                                  bool is_tcp) {
@@ -113,10 +137,12 @@ asio::awaitable<std::error_code> MuxStream::Write(IOBufPtr&& buf, size_t len) {
   co_return std::error_code{};
 }
 asio::awaitable<std::error_code> MuxStream::Close(bool close_by_remote) {
-  data_channel_.close();
   if (is_remote_closed_) {
     co_return std::error_code{};
   }
+  SNOVA_INFO("[{}]Close from remote peer:{}", sid_, close_by_remote);
+  data_channel_.close();
+  is_remote_closed_ = true;
   if (close_by_remote) {
     // do nothing
   } else {
@@ -127,7 +153,6 @@ asio::awaitable<std::error_code> MuxStream::Close(bool close_by_remote) {
       co_return std::make_error_code(std::errc::no_link);
     }
   }
-  is_remote_closed_ = true;
   co_return std::error_code{};
 }
 }  // namespace snova

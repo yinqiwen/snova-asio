@@ -23,11 +23,16 @@ cc_library(
     deps = [
         ":local_relay",
         "//snova/io",
+        "//snova/io:read_until",
         "//snova/log:log_api",
         "//snova/mux:mux_client",
+        "//snova/util:flags",
+        "//snova/util:http_helper",
         "//snova/util:net_helper",
         "//snova/util:sni",
         "@asio",
+        "@com_google_absl//absl/cleanup",
+        "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -48,7 +53,9 @@ cc_library(
         "//snova/mux:mux_connection",
         "//snova/mux:mux_server",
         "//snova/util:net_helper",
+        "//snova/util:time_wheel",
         "@asio",
+        "@com_google_absl//absl/cleanup",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -66,7 +73,10 @@ cc_library(
         "//snova/io:transfer",
         "//snova/log:log_api",
         "//snova/mux:mux_client",
+        "//snova/util:flags",
+        "//snova/util:time_wheel",
         "@asio",
+        "@com_google_absl//absl/cleanup",
     ],
 )
 
@@ -80,6 +90,7 @@ cc_library(
     ],
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
+        ":local_relay",
         "//snova/io",
         "//snova/io:transfer",
         "//snova/log:log_api",
@@ -87,5 +98,6 @@ cc_library(
         "//snova/mux:mux_server",
         "//snova/mux:mux_stream",
         "@asio",
+        "@com_google_absl//absl/cleanup",
     ],
 )

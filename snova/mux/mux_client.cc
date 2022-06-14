@@ -28,32 +28,40 @@
  */
 #include "snova/mux/mux_client.h"
 #include <memory>
-#include "absl/flags/declare.h"
-#include "absl/flags/flag.h"
+
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/log/log_macros.h"
+#include "snova/util/flags.h"
 #include "snova/util/net_helper.h"
-#include "spdlog/fmt/bundled/ostream.h"
-
-ABSL_DECLARE_FLAG(std::string, remote);
-ABSL_FLAG(uint32_t, conn_num_per_server, 3, "Remote server connection number per server.");
+#include "snova/util/time_wheel.h"
+#include "spdlog/fmt/fmt.h"
 
 namespace snova {
 std::shared_ptr<MuxClient>& MuxClient::GetInstance() {
   static std::shared_ptr<MuxClient> g_instance = std::make_shared<MuxClient>();
   return g_instance;
 }
+
 asio::awaitable<std::error_code> MuxClient::NewConnection(uint32_t idx) {
   if (idx >= remote_conns_.size()) {
     co_return std::make_error_code(std::errc::invalid_argument);
   }
   auto ex = co_await asio::this_coro::executor;
   ::asio::ip::tcp::socket socket(ex);
-  auto [ec] = co_await socket.async_connect(remote_endpoint_,
-                                            ::asio::experimental::as_tuple(::asio::use_awaitable));
-  if (ec) {
-    SNOVA_ERROR("Failed to connect:{} with error:{}", remote_endpoint_, ec);
-    co_return ec;
+  if (g_http_proxy_host.empty()) {
+    auto [ec] = co_await socket.async_connect(
+        remote_endpoint_, ::asio::experimental::as_tuple(::asio::use_awaitable));
+    if (ec) {
+      SNOVA_ERROR("Failed to connect:{} with error:{}", remote_endpoint_, ec);
+      co_return ec;
+    }
+  } else {
+    auto ec = co_await connect_remote_via_http_proxy(socket, remote_endpoint_, g_http_proxy_host,
+                                                     g_http_proxy_port);
+    if (ec) {
+      SNOVA_ERROR("Failed to connect:{} via http proxy with error:{}", remote_endpoint_, ec);
+      co_return ec;
+    }
   }
 
   std::unique_ptr<CipherContext> cipher_ctx = CipherContext::New(cipher_method_, cipher_key_);
@@ -69,18 +77,20 @@ asio::awaitable<std::error_code> MuxClient::NewConnection(uint32_t idx) {
       ex,
       [this, idx, conn]() -> asio::awaitable<void> {
         co_await conn->ReadEventLoop();
-        remote_conns_[idx] = nullptr;
+        if (!conn->IsRetired()) {
+          remote_conns_[idx] = nullptr;
+        }
         co_return;
       },
       ::asio::detached);
   remote_conns_[idx] = conn;
-  co_return ec;
+  co_return std::error_code{};
 }
 asio::awaitable<std::error_code> MuxClient::Init(const std::string& user,
                                                  const std::string& cipher_method,
                                                  const std::string& cipher_key) {
-  remote_conns_.resize(absl::GetFlag(FLAGS_conn_num_per_server));
-  PaserEndpointResult parse_result = parse_endpoint(absl::GetFlag(FLAGS_remote));
+  remote_conns_.resize(g_conn_num_per_server);
+  PaserEndpointResult parse_result = parse_endpoint(g_remote_server);
   if (parse_result.second) {
     co_return parse_result.second;
   }
@@ -99,11 +109,12 @@ asio::awaitable<std::error_code> MuxClient::Init(const std::string& user,
     co_return ec;
   }
 
-  for (uint32_t i = 1; i < absl::GetFlag(FLAGS_conn_num_per_server); i++) {
+  for (uint32_t i = 1; i < g_conn_num_per_server; i++) {
     co_await NewConnection(i);
   }
   auto ex = co_await asio::this_coro::executor;
   ::asio::co_spawn(ex, CheckConnections(), ::asio::detached);
+  co_return std::error_code{};
 }
 asio::awaitable<void> MuxClient::CheckConnections() {
   auto ex = co_await asio::this_coro::executor;
@@ -111,10 +122,34 @@ asio::awaitable<void> MuxClient::CheckConnections() {
   std::chrono::milliseconds period(3000);
   while (true) {
     timer.expires_after(period);
-    co_await timer.async_wait(::asio::use_awaitable);
-    for (uint32_t i = 0; i < absl::GetFlag(FLAGS_conn_num_per_server); i++) {
+    co_await timer.async_wait(::asio::experimental::as_tuple(::asio::use_awaitable));
+    for (uint32_t i = 0; i < g_conn_num_per_server; i++) {
       if (!remote_conns_[i]) {
         co_await NewConnection(i);
+      } else {
+        uint32_t now = time(nullptr);
+        if (now > remote_conns_[i]->GetExpireAtUnixSecs()) {
+          SNOVA_INFO("[{}]Try to retire connection since now:{}, retire time:{}", i, now,
+                     remote_conns_[i]->GetExpireAtUnixSecs());
+          auto retired_conn = remote_conns_[i];
+          retired_conn->SetRetired();
+          remote_conns_[i] = nullptr;
+          auto retire_event = std::make_unique<RetireConnRequest>();
+          co_await retired_conn->WriteEvent(std::move(retire_event));
+          TimerTask timer_task;
+          timer_task.timeout_callback = [retired_conn]() -> asio::awaitable<void> {
+            SNOVA_ERROR("[{}]Close retired connection since it's not active since {}s ago.",
+                        retired_conn->GetIdx(),
+                        time(nullptr) - retired_conn->GetLastActiveUnixSecs());
+            retired_conn->Close();
+            co_return;
+          };
+          timer_task.get_active_time = [retired_conn]() -> uint32_t {
+            return retired_conn->GetLastActiveUnixSecs();
+          };
+          timer_task.timeout_secs = 15;
+          TimeWheel::GetInstance()->Register(std::move(timer_task));
+        }
       }
     }
   }
@@ -122,14 +157,19 @@ asio::awaitable<void> MuxClient::CheckConnections() {
 }
 
 MuxConnectionPtr MuxClient::SelectConnection() {
-  size_t check_count = 0;
-  while (check_count < remote_conns_.size()) {
-    auto conn = remote_conns_[select_cursor_ % remote_conns_.size()];
-    select_cursor_++;
-    check_count++;
-    if (conn) {
-      return conn;
+  uint32_t min_send_bytes = 0;
+  int32_t select_idx = -1;
+  for (size_t i = 0; i < remote_conns_.size(); i++) {
+    if (!remote_conns_[i]) {
+      continue;
     }
+    if (-1 == select_idx || remote_conns_[i]->GetSendBytes() < min_send_bytes) {
+      select_idx = i;
+      min_send_bytes = remote_conns_[i]->GetSendBytes();
+    }
+  }
+  if (select_idx >= 0) {
+    return remote_conns_[select_idx];
   }
   return nullptr;
 }
@@ -142,9 +182,48 @@ EventWriterFactory MuxClient::GetEventWriterFactory() {
     if (!conn) {
       return {};
     }
-    return std::bind(&MuxConnection::Write, conn, std::placeholders::_1);
+    uint32_t conn_idx = conn->GetIdx();
+    return [conn_idx](std::unique_ptr<MuxEvent>&& event) -> asio::awaitable<bool> {
+      auto write_conn = MuxClient::GetInstance()->remote_conns_[conn_idx];
+      if (write_conn) {
+        co_return co_await write_conn->Write(std::move(event));
+      }
+      co_return false;
+    };
   };
   return f;
+}
+
+void MuxClient::ReportStatInfo(StatValues& stats) {
+  auto& kv = stats["MuxClient"];
+  uint32_t now = time(nullptr);
+  for (size_t i = 0; i < remote_conns_.size(); i++) {
+    if (!remote_conns_[i]) {
+      kv[fmt::format("[{}]", i)] = "NULL";
+    } else {
+      kv[fmt::format("[{}]inactive_secs", i)] =
+          std::to_string(now - remote_conns_[i]->GetLastActiveUnixSecs());
+      kv[fmt::format("[{}]recv_bytes", i)] = std::to_string(remote_conns_[i]->GetRecvBytes());
+      kv[fmt::format("[{}]send_bytes", i)] = std::to_string(remote_conns_[i]->GetSendBytes());
+    }
+  }
+}
+
+void register_mux_stat() {
+  register_stat_func([]() -> StatValues {
+    StatValues vals;
+    auto& kv = vals["Mux"];
+    kv["stream_num"] = std::to_string(MuxStream::Size());
+    kv["stream_active_num"] = std::to_string(MuxStream::ActiveSize());
+    kv["connection_num"] = std::to_string(MuxConnection::Size());
+    kv["connection_active_num"] = std::to_string(MuxConnection::ActiveSize());
+    return vals;
+  });
+  register_stat_func([]() -> StatValues {
+    StatValues vals;
+    MuxClient::GetInstance()->ReportStatInfo(vals);
+    return vals;
+  });
 }
 
 }  // namespace snova

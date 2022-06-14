@@ -16,6 +16,7 @@ MIMALLOC_COPTS = select({
 }) + select({
     "@bazel_tools//src/conditions:darwin": [
         "-DMI_OSX_ZONE=1 -DMI_OSX_INTERPOSE=1",
+        "-Wpedantic -Wno-static-in-inline",
     ],
     "//conditions:default": [
     ],
@@ -29,9 +30,48 @@ cc_library(
     strip_include_prefix = "include",
 )
 
+# cc_library(
+#     name = "libmimalloc",
+#     srcs = [
+#         "src/alloc.c",
+#         "src/alloc-aligned.c",
+#         "src/alloc-posix.c",
+#         "src/arena.c",
+#         "src/bitmap.c",
+#         "src/heap.c",
+#         "src/init.c",
+#         "src/options.c",
+#         "src/os.c",
+#         "src/page.c",
+#         "src/random.c",
+#         "src/segment.c",
+#         "src/segment-cache.c",
+#         "src/stats.c",
+#     ] + select({
+#         "@bazel_tools//src/conditions:darwin": [
+#             "src/alloc-override-osx.c",
+#         ],
+#         "//conditions:default": [
+#         ],
+#     }),
+#     hdrs = [
+#         "src/alloc-override.c",
+#         "src/bitmap.h",
+#         "src/page-queue.c",
+#     ],
+#     copts = MIMALLOC_COPTS,
+#     deps = [":mimalloc_headers"],
+# )
+
 cc_library(
     name = "libmimalloc",
     srcs = [
+        "src/static.c",
+    ],
+    hdrs = [
+        "src/alloc-override.c",
+        "src/bitmap.h",
+        "src/page-queue.c",
         "src/alloc.c",
         "src/alloc-aligned.c",
         "src/alloc-posix.c",
@@ -53,11 +93,6 @@ cc_library(
         "//conditions:default": [
         ],
     }),
-    hdrs = [
-        "src/alloc-override.c",
-        "src/bitmap.h",
-        "src/page-queue.c",
-    ],
     copts = MIMALLOC_COPTS,
     deps = [":mimalloc_headers"],
 )

@@ -30,6 +30,8 @@
 #pragma once
 #include "spdlog/spdlog.h"
 
+#include "spdlog/fmt/bundled/ostream.h"  // do NOT put this line before spdlog
+
 #define SNOVA_DEBUG(...)                                                 \
   do {                                                                   \
     auto logger = spdlog::default_logger_raw();                          \

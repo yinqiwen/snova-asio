@@ -26,44 +26,13 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <limits>
-#include <string>
-#include <vector>
-#include "absl/flags/flag.h"
-#include "absl/flags/parse.h"
-#include "absl/random/random.h"
-#include "snova/log/log_macros.h"
-#include "snova/mux/mux_client.h"
-#include "snova/server/local_server.h"
-ABSL_FLAG(std::string, listen, "127.0.0.1:48100", "Listen address");
-ABSL_FLAG(std::string, remote, "", "Remote server address");
-ABSL_FLAG(std::string, cipher_method, "chacha20_poly1305", "Cipher method");
-ABSL_FLAG(std::string, cipher_key, "default cipher key", "Cipher key");
-ABSL_FLAG(std::string, user, "demo_user", "Auth user name");
 
-int main(int argc, char** argv) {
-  absl::ParseCommandLine(argc, argv);
-  std::string listen = absl::GetFlag(FLAGS_listen);
-  std::string auth_user = absl::GetFlag(FLAGS_user);
-  std::string cipher_method = absl::GetFlag(FLAGS_cipher_method);
-  std::string cipher_key = absl::GetFlag(FLAGS_cipher_key);
+#pragma once
+#include <string_view>
+#include "asio.hpp"
+#include "snova/io/io.h"
 
-  absl::BitGen bitgen;
-  uint64_t client_id = absl::Uniform<uint64_t>(bitgen, 0, std::numeric_limits<uint64_t>::max());
-  snova::MuxClient::GetInstance()->SetClientId(client_id);
-  ::asio::io_context ctx;
-  ::asio::co_spawn(
-      ctx,
-      [&]() -> asio::awaitable<void> {
-        auto ec =
-            co_await snova::MuxClient::GetInstance()->Init(auth_user, cipher_method, cipher_key);
-        if (ec) {
-          co_return;
-        }
-        auto ex = co_await asio::this_coro::executor;
-        ::asio::co_spawn(ex, snova::start_local_server(listen), ::asio::detached);
-      },
-      ::asio::detached);
-  ctx.run();
-  return 0;
+namespace snova {
+asio::awaitable<int> read_until(::asio::ip::tcp::socket& socket, IOBuf& buf, size_t& readed_len,
+                                std::string_view until);
 }

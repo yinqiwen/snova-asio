@@ -28,21 +28,7 @@
  */
 
 #pragma once
-#include <string>
-#include <system_error>
-#include <vector>
-
-#include "asio.hpp"
-#include "asio/experimental/awaitable_operators.hpp"
-#include "snova/io/io.h"
+#include <cstdint>
 namespace snova {
-asio::awaitable<std::error_code> start_local_server(const std::string& addr);
-
-asio::awaitable<void> handle_socks5_connection(::asio::ip::tcp::socket&& sock,
-                                               IOBufPtr&& read_buffer, Bytes& readable_data);
-asio::awaitable<void> handle_tls_connection(::asio::ip::tcp::socket&& sock, IOBufPtr&& read_buffer,
-                                            Bytes& readable_data);
-asio::awaitable<void> handle_http_connection(::asio::ip::tcp::socket&& sock, IOBufPtr&& read_buffer,
-                                             Bytes& readable_data);
-
-}  // namespace snova
+uint64_t random_uint64(uint64_t min, uint64_t max);
+}

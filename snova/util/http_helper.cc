@@ -26,23 +26,23 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include "snova/util/http_helper.h"
 
-#pragma once
-#include <string>
-#include <system_error>
-#include <vector>
-
-#include "asio.hpp"
-#include "asio/experimental/awaitable_operators.hpp"
-#include "snova/io/io.h"
 namespace snova {
-asio::awaitable<std::error_code> start_local_server(const std::string& addr);
-
-asio::awaitable<void> handle_socks5_connection(::asio::ip::tcp::socket&& sock,
-                                               IOBufPtr&& read_buffer, Bytes& readable_data);
-asio::awaitable<void> handle_tls_connection(::asio::ip::tcp::socket&& sock, IOBufPtr&& read_buffer,
-                                            Bytes& readable_data);
-asio::awaitable<void> handle_http_connection(::asio::ip::tcp::socket&& sock, IOBufPtr&& read_buffer,
-                                             Bytes& readable_data);
-
+int parse_http_hostport(absl::string_view recv_data, absl::string_view& hostport) {
+  absl::string_view host_key = "Host:";
+  auto pos = recv_data.find(host_key);
+  if (pos == absl::string_view::npos) {
+    return -1;
+  }
+  absl::string_view crlf = "\r\n";
+  auto end_pos = recv_data.find(crlf, pos);
+  if (end_pos == absl::string_view::npos) {
+    return -1;
+  }
+  size_t n = (end_pos - pos - host_key.size());
+  hostport = absl::string_view(recv_data.data() + pos + host_key.size(), n);
+  //   hostport.assign(recv_data.data() + pos + host_key.size(), n);
+  return 0;
+}
 }  // namespace snova

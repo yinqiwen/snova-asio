@@ -201,6 +201,12 @@ int StreamCloseRequest::Encode(MutableBytes& buffer) const {
 }
 int StreamCloseRequest::Decode(const Bytes& buffer) { return 0; }
 
+int RetireConnRequest::Encode(MutableBytes& buffer) const {
+  buffer.remove_suffix(buffer.size());
+  return 0;
+}
+int RetireConnRequest::Decode(const Bytes& buffer) { return 0; }
+
 int StreamChunk::Encode(MutableBytes& buffer) const {
   if (buffer.size() < (sizeof(chunk_len) + chunk_len)) {
     SNOVA_INFO("Require {}bytes, but got {} bytes.", (sizeof(chunk_len) + chunk_len),
@@ -218,6 +224,9 @@ int StreamChunk::Encode(MutableBytes& buffer) const {
 }
 int StreamChunk::Decode(const Bytes& buffer) {
   RETURN_NOT_OK(decode_int(buffer, 0, chunk_len));
+  if (chunk_len > 2 * kMaxChunkSize) {
+    return ERR_INVALID_EVENT;
+  }
   size_t pos = sizeof(chunk_len);
   if (buffer.size() < (pos + chunk_len)) {
     return ERR_TOO_SMALL_EVENT_DECODE_CONTENT;

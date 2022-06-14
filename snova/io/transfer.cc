@@ -33,13 +33,42 @@
 #include "spdlog/fmt/bundled/ostream.h"
 namespace snova {
 using namespace asio::experimental::awaitable_operators;
-asio::awaitable<void> transfer_stream(StreamPtr from, ::asio::ip::tcp::socket& to) {
+
+asio::awaitable<void> transfer(StreamPtr from, StreamPtr to, const TransferRoutineFunc& routine) {
   while (true) {
     auto [data, len, ec] = co_await from->Read();
     if (ec) {
       // co_await from->Close(false);
       SNOVA_ERROR("Read ERROR {} {}", len, ec);
       break;
+    }
+    if (routine) {
+      routine();
+    }
+    auto wec = co_await to->Write(std::move(data), len);
+    if (wec) {
+      // co_await from->Close(false);
+      SNOVA_ERROR("async_write ERROR {} ", wec);
+      break;
+    }
+    if (routine) {
+      routine();
+    }
+  }
+  co_await to->Close(false);
+  co_return;
+}
+
+asio::awaitable<void> transfer(StreamPtr from, SocketRef to, const TransferRoutineFunc& routine) {
+  while (true) {
+    auto [data, len, ec] = co_await from->Read();
+    if (ec) {
+      // co_await from->Close(false);
+      SNOVA_ERROR("[{}]Read ERROR {}", from->GetID(), ec);
+      break;
+    }
+    if (routine) {
+      routine();
     }
     auto [wec, wn] =
         co_await ::asio::async_write(to, ::asio::buffer(data->data(), len),
@@ -50,22 +79,57 @@ asio::awaitable<void> transfer_stream(StreamPtr from, ::asio::ip::tcp::socket& t
       SNOVA_ERROR("async_write ERROR {} ", wec);
       break;
     }
+    if (routine) {
+      routine();
+    }
   }
+  co_await from->Close(false);
+  to.close();
   co_return;
 }
-asio::awaitable<void> transfer_socket(::asio::ip::tcp::socket& from, StreamPtr to) {
+asio::awaitable<void> transfer(SocketRef from, StreamPtr to, const TransferRoutineFunc& routine) {
   while (true) {
     IOBufPtr buf = get_iobuf(kMaxChunkSize);
     auto [ec, n] =
-        co_await from.async_read_some(::asio::buffer(buf->data(), buf->size()),
+        co_await from.async_read_some(::asio::buffer(buf->data(), kMaxChunkSize),
                                       ::asio::experimental::as_tuple(::asio::use_awaitable));
     if (ec) {
       break;
+    }
+    if (routine) {
+      routine();
     }
 
     auto wec = co_await to->Write(std::move(buf), n);
     if (wec) {
       break;
+    }
+    if (routine) {
+      routine();
+    }
+  }
+  co_await to->Close(false);
+  co_return;
+}
+asio::awaitable<void> transfer(SocketRef from, SocketRef to, const TransferRoutineFunc& routine) {
+  IOBufPtr buf = get_iobuf(kMaxChunkSize);
+  while (true) {
+    auto [ec, n] =
+        co_await from.async_read_some(::asio::buffer(buf->data(), kMaxChunkSize),
+                                      ::asio::experimental::as_tuple(::asio::use_awaitable));
+    if (ec) {
+      break;
+    }
+    if (routine) {
+      routine();
+    }
+    auto [wec, wn] = co_await ::asio::async_write(
+        to, ::asio::buffer(buf->data(), n), ::asio::experimental::as_tuple(::asio::use_awaitable));
+    if (wec) {
+      break;
+    }
+    if (routine) {
+      routine();
     }
   }
   co_return;

@@ -27,23 +27,36 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/mux/mux_connection.h"
-#include "absl/random/random.h"
 #include "asio/experimental/as_tuple.hpp"
+#include "snova/util/flags.h"
+#include "snova/util/misc_helper.h"
 #include "spdlog/fmt/bundled/ostream.h"
 
 namespace snova {
+static uint32_t g_mux_conn_num = 0;
+static uint32_t g_mux_conn_num_in_loop = 0;
+size_t MuxConnection::Size() { return g_mux_conn_num; }
+size_t MuxConnection::ActiveSize() { return g_mux_conn_num_in_loop; }
 MuxConnection::MuxConnection(::asio::ip::tcp::socket&& sock,
                              std::unique_ptr<CipherContext>&& cipher_ctx, bool is_local)
     : socket_(std::move(sock)),
       cipher_ctx_(std::move(cipher_ctx)),
       client_id_(0),
       idx_(0),
+      expire_at_unix_secs_(0),
+      last_unmatch_stream_id_(0),
+      last_active_unix_secs_(0),
+      recv_bytes_(0),
+      send_bytes_(0),
       is_local_(is_local),
-      is_authed_(false) {
+      is_authed_(false),
+      retired_(false) {
   write_buffer_.resize(kMaxChunkSize + kEventHeadSize + kReservedBufferSize);
   read_buffer_.resize(2 * kMaxChunkSize);
+  g_mux_conn_num++;
+  expire_at_unix_secs_ = (time(nullptr) + g_connection_expire_secs + random_uint64(0, 60));
 }
-MuxConnection::~MuxConnection() {}
+MuxConnection::~MuxConnection() { g_mux_conn_num--; }
 
 asio::awaitable<ServerAuthResult> MuxConnection::ServerAuth() {
   if (is_local_) {
@@ -53,6 +66,9 @@ asio::awaitable<ServerAuthResult> MuxConnection::ServerAuth() {
   std::unique_ptr<MuxEvent> auth_req;
   int rc = co_await ReadEvent(auth_req);
   if (0 != rc) {
+    SNOVA_ERROR(
+        "Oops! Read auth request failed with rc:{}, maybe the client cipher config is invalid.",
+        rc);
     co_return ServerAuthResult{0, false};
   }
   AuthRequest* auth_req_event = dynamic_cast<AuthRequest*>(auth_req.get());
@@ -60,8 +76,9 @@ asio::awaitable<ServerAuthResult> MuxConnection::ServerAuth() {
     SNOVA_ERROR("Recv non auth reqeust with type:{}", auth_req->head.type);
     co_return ServerAuthResult{0, false};
   }
-  absl::BitGen bitgen;
-  uint64_t iv = absl::Uniform(bitgen, 0, 102 * 1024 * 1024LL);
+  uint64_t iv = random_uint64(0, 102 * 1024 * 1024LL);
+  // absl::BitGen bitgen;
+  // uint64_t iv = absl::Uniform(bitgen, 0, 102 * 1024 * 1024LL);
   std::unique_ptr<AuthResponse> auth_res = std::make_unique<AuthResponse>();
   auth_res->success = true;
   auth_res->iv = iv;
@@ -84,12 +101,15 @@ asio::awaitable<bool> MuxConnection::ClientAuth(const std::string& user, uint64_
   auth->client_id = client_id;
   bool write_success = co_await WriteEvent(std::move(auth));
   if (!write_success) {
+    SNOVA_ERROR("Write auth request failed.");
     co_return false;
   }
   // SNOVA_INFO("Success to send auth request.");
   std::unique_ptr<MuxEvent> auth_res;
   int rc = co_await ReadEvent(auth_res);
   if (0 != rc) {
+    SNOVA_ERROR("Oops! Read auth response failed with rc:{}, maybe the cipher config is invalid.",
+                rc);
     co_return false;
   }
   AuthResponse* auth_res_event = dynamic_cast<AuthResponse*>(auth_res.get());
@@ -107,50 +127,58 @@ asio::awaitable<bool> MuxConnection::ClientAuth(const std::string& user, uint64_
   }
   co_return success;
 }
-int MuxConnection::ReadEventFromBuffer(std::unique_ptr<MuxEvent>& event) {
-  if (readable_data_.size() == 0) {
+int MuxConnection::ReadEventFromBuffer(std::unique_ptr<MuxEvent>& event, Bytes& buffer) {
+  if (buffer.size() == 0) {
     return ERR_NEED_MORE_INPUT_DATA;
   }
   size_t decrypt_len = 0;
-  int rc = cipher_ctx_->Decrypt(readable_data_, event, decrypt_len);
+  int rc = cipher_ctx_->Decrypt(buffer, event, decrypt_len);
   if (0 == rc) {
-    readable_data_.remove_prefix(decrypt_len);
+    buffer.remove_prefix(decrypt_len);
     return 0;
   }
   if (rc != ERR_NEED_MORE_INPUT_DATA) {
-    SNOVA_ERROR("Failed to read event with rc:{}", rc);
+    SNOVA_ERROR("[{}]Failed to read event with rc:{}", idx_, rc);
     return rc;
   }
-  if (read_buffer_.data() != readable_data_.data()) {
-    memmove(read_buffer_.data(), readable_data_.data(), readable_data_.size());
+  if (read_buffer_.data() != buffer.data()) {
+    memmove(read_buffer_.data(), buffer.data(), buffer.size());
   }
   return ERR_NEED_MORE_INPUT_DATA;
 }
 asio::awaitable<int> MuxConnection::ReadEvent(std::unique_ptr<MuxEvent>& event) {
+  Bytes current_read_buffer = readable_data_;
+  int rc = 0;
   while (true) {
-    int rc = ReadEventFromBuffer(event);
+    rc = ReadEventFromBuffer(event, current_read_buffer);
     if (rc == 0) {
-      co_return rc;
+      break;
     }
     if (rc != ERR_NEED_MORE_INPUT_DATA) {
-      co_return rc;
+      break;
     }
-    size_t read_pos = readable_data_.size();
+    size_t read_pos = current_read_buffer.size();
     // SNOVA_INFO("start read {} {}.", read_pos, read_buffer_.size() - read_pos);
     auto [ec, n] = co_await socket_.async_read_some(
         ::asio::buffer(read_buffer_.data() + read_pos, read_buffer_.size() - read_pos),
         ::asio::experimental::as_tuple(::asio::use_awaitable));
     if (ec) {
       SNOVA_ERROR("Failed to read event with error:{}", ec);
-      co_return ec.value();
+      rc = ec.value();
+      break;
     }
     if (0 == n) {  // EOF
       SNOVA_ERROR("Failed to read event with EOF.");
-      co_return ERR_READ_EOF;
+      rc = ERR_READ_EOF;
+      break;
     }
+    recv_bytes_ += n;
     // SNOVA_INFO("Read {} bytes.", n);
-    readable_data_ = Bytes{read_buffer_.data(), read_pos + n};
+    // readable_data_ = Bytes{read_buffer_.data(), read_pos + n};
+    current_read_buffer = absl::MakeSpan(read_buffer_.data(), read_pos + n);
   }
+  readable_data_ = current_read_buffer;
+  co_return rc;
 }
 
 asio::awaitable<int> MuxConnection::ProcessReadEvent() {
@@ -159,8 +187,15 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
   if (0 != rc) {
     co_return rc;
   }
-  // SNOVA_INFO("[{}]Recv event:{}", event->head.sid, event->head.type);
   switch (event->head.type) {
+    case EVENT_RETIRE_CONN_REQ: {
+      SNOVA_INFO("[{}]Recv retired request.", idx_);
+      retired_ = true;
+      if (retire_callback_) {
+        retire_callback_(this);
+      }
+      break;
+    }
     case EVENT_STREAM_OPEN: {
       StreamOpenRequest* open_request = dynamic_cast<StreamOpenRequest*>(event.get());
       if (nullptr == open_request) {
@@ -178,18 +213,27 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
       break;
     }
     case EVENT_STREAM_CLOSE: {
-      MuxStreamPtr stream = MuxStream::Get(event->head.sid);
+      SNOVA_INFO("[{}][{}]Recv stream close event.", idx_, event->head.sid);
+      MuxStreamPtr stream = MuxStream::Get(client_id_, event->head.sid);
       if (!stream) {
-        SNOVA_ERROR("[{}]No stream found to close.", event->head.sid);
+        // SNOVA_ERROR("[{}][{}]No stream found to close.", idx_, event->head.sid);
       } else {
         co_await stream->Close(true);
       }
       break;
     }
     case EVENT_STREAM_CHUNK: {
-      MuxStreamPtr stream = MuxStream::Get(event->head.sid);
+      MuxStreamPtr stream = MuxStream::Get(client_id_, event->head.sid);
       if (!stream) {
-        SNOVA_ERROR("[{}]No stream found to handle chunk.", event->head.sid);
+        if (last_unmatch_stream_id_ != event->head.sid) {
+          SNOVA_ERROR("[{}][{}]No stream found to handle chunk with len:{}", idx_, event->head.sid,
+                      event->head.len);
+          SNOVA_ERROR("[{}][{}]Force close remote stream.", idx_, event->head.sid);
+          last_unmatch_stream_id_ = event->head.sid;
+          auto close_ev = std::make_unique<StreamCloseRequest>();
+          close_ev->head.sid = event->head.sid;
+          co_await WriteEvent(std::move(close_ev));
+        }
       } else {
         StreamChunk* chunk = dynamic_cast<StreamChunk*>(event.get());
         if (nullptr == chunk) {
@@ -201,7 +245,7 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
       break;
     }
     default: {
-      SNOVA_ERROR("[{}]Unknown event type:{}", event->head.sid, event->head.type);
+      SNOVA_ERROR("[{}][{}]Unknown event type:{}", idx_, event->head.sid, event->head.type);
       break;
     }
   }
@@ -210,19 +254,24 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
 }
 
 asio::awaitable<void> MuxConnection::ReadEventLoop() {
+  g_mux_conn_num_in_loop++;
   while (true) {
     int rc = co_await ProcessReadEvent();
-    if (0 != rc) {
-      Close();
-      co_return;
+    if (0 != rc && ERR_NEED_MORE_INPUT_DATA != rc) {
+      break;
     }
+    last_active_unix_secs_ = time(nullptr);
   }
+  Close();
+  g_mux_conn_num_in_loop--;
+  SNOVA_INFO("Close mux connection:{}, retired:{}", idx_, retired_);
 }
 
 void MuxConnection::Close() { socket_.close(); }
 
 asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev) {
   // SNOVA_INFO("[{}]Write event:{}", write_ev->head.sid, write_ev->head.type);
+  last_active_unix_secs_ = time(nullptr);
   MutableBytes wbuffer(write_buffer_.data(), write_buffer_.size());
   int rc = cipher_ctx_->Encrypt(write_ev, wbuffer);
   if (0 != rc) {
@@ -233,9 +282,10 @@ asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev)
       co_await ::asio::async_write(socket_, ::asio::buffer(wbuffer.data(), wbuffer.size()),
                                    ::asio::experimental::as_tuple(::asio::use_awaitable));
   if (ec) {
-    SNOVA_ERROR("Write auth request failed with error:{}", ec.value());
+    SNOVA_ERROR("Write event:{} failed with error:{}", write_ev->head.type, ec);
     co_return false;
   }
+  send_bytes_ += wbuffer.size();
   co_return true;
 }
 

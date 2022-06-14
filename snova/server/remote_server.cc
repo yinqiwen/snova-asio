@@ -30,6 +30,7 @@
 #include <string_view>
 #include <system_error>
 
+#include "absl/cleanup/cleanup.h"
 #include "absl/strings/str_split.h"
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/log/log_macros.h"
@@ -37,10 +38,15 @@
 #include "snova/mux/mux_server.h"
 #include "snova/server/remote_relay.h"
 #include "snova/util/net_helper.h"
+#include "snova/util/stat.h"
+#include "snova/util/time_wheel.h"
 
 namespace snova {
+static uint32_t g_remote_server_conn_num = 0;
 static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock, std::string cipher_method,
                                            std::string cipher_key) {
+  g_remote_server_conn_num++;
+  absl::Cleanup auto_counter = [] { g_remote_server_conn_num--; };
   std::unique_ptr<CipherContext> cipher_ctx = CipherContext::New(cipher_method, cipher_key);
   MuxConnectionPtr mux_conn =
       std::make_shared<MuxConnection>(std::move(sock), std::move(cipher_ctx), false);
@@ -50,6 +56,23 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock, std::st
     co_return;
   }
   mux_conn->SetServerRelayFunc(server_relay);
+  mux_conn->SetRetireCallback([](MuxConnection* c) {
+    SNOVA_INFO("[{}]Connection retired!", c->GetIdx());
+    MuxServer::GetInstance()->Remove(c->GetClientId(), c);
+    auto retired_conn = c->GetShared();
+    TimerTask timer_task;
+    timer_task.timeout_callback = [retired_conn]() -> asio::awaitable<void> {
+      SNOVA_ERROR("[{}]Close retired connection since it's not active since {}s ago.",
+                  retired_conn->GetIdx(), time(nullptr) - retired_conn->GetLastActiveUnixSecs());
+      retired_conn->Close();
+      co_return;
+    };
+    timer_task.get_active_time = [retired_conn]() -> uint32_t {
+      return retired_conn->GetLastActiveUnixSecs();
+    };
+    timer_task.timeout_secs = 60;
+    TimeWheel::GetInstance()->Register(std::move(timer_task));
+  });
   uint32_t idx = MuxServer::GetInstance()->Add(client_id, mux_conn);
   mux_conn->SetIdx(idx);
   auto ex = co_await asio::this_coro::executor;
@@ -78,7 +101,13 @@ static ::asio::awaitable<void> server_loop(::asio::ip::tcp::acceptor server,
 asio::awaitable<std::error_code> start_remote_server(const std::string& addr,
                                                      const std::string& cipher_method,
                                                      const std::string& cipher_key) {
-  SNOVA_INFO("Start listen on address:{} with cipher_method:{}", addr, cipher_method);
+  SNOVA_INFO("Start listen on address [{}] with cipher_method:{}", addr, cipher_method);
+  register_stat_func([]() -> StatValues {
+    StatValues vals;
+    auto& kv = vals["RemoteServer"];
+    kv["remote_server_conn_num"] = std::to_string(g_remote_server_conn_num);
+    return vals;
+  });
   std::unique_ptr<CipherContext> cipher_ctx = CipherContext::New(cipher_method, cipher_key);
   if (!cipher_ctx) {
     co_return std::make_error_code(std::errc::invalid_argument);

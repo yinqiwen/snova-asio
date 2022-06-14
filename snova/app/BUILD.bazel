@@ -9,45 +9,57 @@ package(
 )
 
 cc_binary(
-    name = "snova-local",
+    name = "snova",
     srcs = [
-        "local_snova.cc",
+        "snova.cc",
     ],
     copts = SNOVA_DEFAULT_COPTS,
     linkopts = SNOVA_DEFAULT_LINKOPTS,
-    linkstatic = 1,
-    malloc = select({
-        "@bazel_tools//src/conditions:windows": "@bazel_tools//tools/cpp:malloc",
-        "//conditions:default": "@com_github_microsoft_mimalloc//:libmimalloc",
-    }),
+    # linkstatic = 1,
+    # malloc = select({
+    #     "@bazel_tools//src/conditions:windows": "@bazel_tools//tools/cpp:malloc",
+    #     "//conditions:default": "@com_github_microsoft_mimalloc//:libmimalloc",
+    # }),
     deps = [
         "//snova/log:log_api",
         "//snova/mux:mux_client",
         "//snova/server:local_server",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/flags:parse",
+        "//snova/server:remote_server",
+        "//snova/util:misc_helper",
+        "//snova/util:stat",
+        "//snova/util:flags",
+        "//snova/util:time_wheel",
+        # "@com_google_absl//absl/flags:config",
+        # "@com_google_absl//absl/flags:flag",
+        # "@com_google_absl//absl/flags:parse",
+        # "@com_google_absl//absl/flags:usage",
+        "@com_google_absl//absl/strings",
+        "@com_github_CLIUtils_CLI11//:CLI11",
     ],
 )
 
-cc_binary(
-    name = "snova-remote",
-    srcs = [
-        "remote_snova.cc",
-    ],
-    copts = SNOVA_DEFAULT_COPTS,
-    linkopts = SNOVA_DEFAULT_LINKOPTS,
-    linkstatic = 1,
-    malloc = select({
-        "@bazel_tools//src/conditions:windows": "@bazel_tools//tools/cpp:malloc",
-        "//conditions:default": "@com_github_microsoft_mimalloc//:libmimalloc",
-    }),
-    deps = [
-        "//snova/log:log_api",
-        "//snova/server:remote_server",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/flags:parse",
-    ],
-)
+# cc_binary(
+#     name = "snova-remote",
+#     srcs = [
+#         "remote_snova.cc",
+#     ],
+#     copts = SNOVA_DEFAULT_COPTS,
+#     linkopts = SNOVA_DEFAULT_LINKOPTS,
+#     linkstatic = 1,
+#     malloc = select({
+#         "@bazel_tools//src/conditions:windows": "@bazel_tools//tools/cpp:malloc",
+#         "//conditions:default": "@com_github_microsoft_mimalloc//:libmimalloc",
+#     }),
+#     deps = [
+#         "//snova/log:log_api",
+#         "//snova/server:remote_server",
+#         "@com_google_absl//absl/flags:config",
+#         "@com_google_absl//absl/flags:flag",
+#         "@com_google_absl//absl/flags:parse",
+#         "@com_google_absl//absl/flags:usage",
+#         "@com_google_absl//absl/strings",
+#     ],
+# )
 
 # cc_binary(
 #     name = "mbedtls",

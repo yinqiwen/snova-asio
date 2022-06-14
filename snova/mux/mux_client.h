@@ -34,15 +34,19 @@
 
 #include "asio.hpp"
 #include "snova/mux/mux_connection.h"
+#include "snova/util/stat.h"
 namespace snova {
 class MuxClient {
  public:
   static std::shared_ptr<MuxClient>& GetInstance();
   static EventWriterFactory GetEventWriterFactory();
   void SetClientId(uint64_t client_id);
+  uint64_t GetClientId() const { return client_id_; }
   asio::awaitable<std::error_code> Init(const std::string& user, const std::string& cipher_method,
                                         const std::string& cipher_key);
   MuxConnectionPtr SelectConnection();
+
+  void ReportStatInfo(StatValues& stats);
 
  private:
   asio::awaitable<std::error_code> NewConnection(uint32_t idx);
@@ -56,4 +60,6 @@ class MuxClient {
   uint32_t select_cursor_ = 0;
   uint64_t client_id_ = 0;
 };
+void register_mux_stat();
+
 }  // namespace snova

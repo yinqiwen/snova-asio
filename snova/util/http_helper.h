@@ -29,20 +29,8 @@
 
 #pragma once
 #include <string>
-#include <system_error>
-#include <vector>
+#include "absl/strings/string_view.h"
 
-#include "asio.hpp"
-#include "asio/experimental/awaitable_operators.hpp"
-#include "snova/io/io.h"
 namespace snova {
-asio::awaitable<std::error_code> start_local_server(const std::string& addr);
-
-asio::awaitable<void> handle_socks5_connection(::asio::ip::tcp::socket&& sock,
-                                               IOBufPtr&& read_buffer, Bytes& readable_data);
-asio::awaitable<void> handle_tls_connection(::asio::ip::tcp::socket&& sock, IOBufPtr&& read_buffer,
-                                            Bytes& readable_data);
-asio::awaitable<void> handle_http_connection(::asio::ip::tcp::socket&& sock, IOBufPtr&& read_buffer,
-                                             Bytes& readable_data);
-
-}  // namespace snova
+int parse_http_hostport(absl::string_view recv_data, absl::string_view& hostport);
+}

@@ -15,6 +15,8 @@ cc_library(
         "io.h",
     ],
     deps = [
+        "//snova/util:flags",
+        "//snova/util:stat",
         "@asio",
         "@com_google_absl//absl/types:span",
     ],
@@ -24,6 +26,17 @@ cc_library(
     name = "transfer",
     srcs = ["transfer.cc"],
     hdrs = ["transfer.h"],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        ":io",
+        "//snova/log:log_api",
+    ],
+)
+
+cc_library(
+    name = "read_until",
+    srcs = ["read_until.cc"],
+    hdrs = ["read_until.h"],
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
         ":io",

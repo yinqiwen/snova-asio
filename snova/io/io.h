@@ -54,12 +54,15 @@ IOBufSharedPtr get_shared_iobuf(size_t n);
 
 using StreamReadResult = std::tuple<IOBufPtr, size_t, std::error_code>;
 struct Stream {
+  virtual uint32_t GetID() const = 0;
   virtual asio::awaitable<StreamReadResult> Read() = 0;
   virtual asio::awaitable<std::error_code> Write(IOBufPtr&& buf, size_t len) = 0;
   virtual asio::awaitable<std::error_code> Close(bool close_by_remote) = 0;
   virtual ~Stream() = default;
 };
 using StreamPtr = std::shared_ptr<Stream>;
-using SocketPtr = std::shared_ptr<::asio::ip::tcp::socket>;
+using SocketRef = ::asio::ip::tcp::socket&;
+
+void register_io_stat();
 
 }  // namespace snova

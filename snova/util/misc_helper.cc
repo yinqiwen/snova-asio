@@ -26,23 +26,18 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include "snova/util/misc_helper.h"
+#include <random>
 
-#pragma once
-#include <string>
-#include <system_error>
-#include <vector>
-
-#include "asio.hpp"
-#include "asio/experimental/awaitable_operators.hpp"
-#include "snova/io/io.h"
 namespace snova {
-asio::awaitable<std::error_code> start_local_server(const std::string& addr);
+uint64_t random_uint64(uint64_t min, uint64_t max) {
+  std::random_device rd;      // Get a random seed from the OS entropy device, or whatever
+  std::mt19937_64 eng(rd());  // Use the 64-bit Mersenne Twister 19937 generator
+                              // and seed it with entropy.
 
-asio::awaitable<void> handle_socks5_connection(::asio::ip::tcp::socket&& sock,
-                                               IOBufPtr&& read_buffer, Bytes& readable_data);
-asio::awaitable<void> handle_tls_connection(::asio::ip::tcp::socket&& sock, IOBufPtr&& read_buffer,
-                                            Bytes& readable_data);
-asio::awaitable<void> handle_http_connection(::asio::ip::tcp::socket&& sock, IOBufPtr&& read_buffer,
-                                             Bytes& readable_data);
-
+  // Define the distribution, by default it goes from 0 to MAX(unsigned long long)
+  // or what have you.
+  std::uniform_int_distribution<unsigned long long> distr(min, max);
+  return distr(eng);
+}
 }  // namespace snova

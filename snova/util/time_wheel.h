@@ -28,21 +28,36 @@
  */
 
 #pragma once
-#include <string>
-#include <system_error>
+#include <functional>
+#include <utility>
 #include <vector>
-
 #include "asio.hpp"
-#include "asio/experimental/awaitable_operators.hpp"
-#include "snova/io/io.h"
+
 namespace snova {
-asio::awaitable<std::error_code> start_local_server(const std::string& addr);
+using TimeoutFunc = std::function<asio::awaitable<void>()>;
+using GetActiveTimeFunc = std::function<uint32_t()>;
+using TimerTaskID = std::pair<uint32_t, uint32_t>;
+using IDUpdateFunc = std::function<void(TimerTaskID&)>;
+struct TimerTask {
+  TimeoutFunc timeout_callback;
+  GetActiveTimeFunc get_active_time;
+  IDUpdateFunc id_update_cb;
+  uint32_t timeout_secs = 0;
+  bool canceled = false;
+};
 
-asio::awaitable<void> handle_socks5_connection(::asio::ip::tcp::socket&& sock,
-                                               IOBufPtr&& read_buffer, Bytes& readable_data);
-asio::awaitable<void> handle_tls_connection(::asio::ip::tcp::socket&& sock, IOBufPtr&& read_buffer,
-                                            Bytes& readable_data);
-asio::awaitable<void> handle_http_connection(::asio::ip::tcp::socket&& sock, IOBufPtr&& read_buffer,
-                                             Bytes& readable_data);
+class TimeWheel {
+ public:
+  static std::shared_ptr<TimeWheel>& GetInstance();
+  TimeWheel(uint32_t max_timeout_secs = 600);
+  TimerTaskID Register(TimerTask&& task);
+  void Cancel(const TimerTaskID& id);
+  asio::awaitable<void> Run();
 
+ private:
+  using TimerTaskQueue = std::vector<TimerTask>;
+  using TimeWheelQueue = std::vector<TimerTaskQueue>;
+  TimeWheelQueue time_wheel_;
+  uint32_t max_timeout_secs_;
+};
 }  // namespace snova
