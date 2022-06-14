@@ -35,12 +35,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: nightly_${{ steps.yesterday.outputs.date }}
       - name: Create Tag
-        uses: laputansoft/github-tag-action@v4.6
+        uses: rickstaa/action-create-tag@v1
         if: always()
         with:
           tag : ${{ env.TAG_NAME }}
-          release_branches : test_ci
+          message: "Latest release"
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          create_annotated_tag: true
         env:
           TAG_NAME: nightly_${{ steps.today.outputs.date }}
