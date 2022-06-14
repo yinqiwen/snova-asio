@@ -1,0 +1,40 @@
+name: First Cron Job
+
+on:
+  # Triggers the workflow every 5 minutes
+  schedule:
+    - cron: "*/5 * * * *"
+
+     # A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "cron"
+  cron:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - name: Get yesterday date
+        id: yesterday
+        run: echo "::set-output name=date::$(date -d 'yesterday' '+%Y%m%d')"
+      - name: Get today date
+        id: today
+        run: echo "::set-output name=date::$(date +'%Y%m%d')"
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Delete Tag
+        uses: dev-drprasad/delete-tag-and-release@v0.2.0
+          with:
+          delete_release: true # default: false
+          tag_name: ${{ env.TAG_NAME }} # tag name to delete
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            TAG_NAME: nightly-${{ steps.yesterday.outputs.date }}
+      - name: Create Tag
+        uses: negz/create-tag@v1
+        if: always()
+        with:
+          version: ${{ env.TAG_NAME }}
+          message: ${{ github.event.inputs.message }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: nightly-${{ steps.today.outputs.date }}
