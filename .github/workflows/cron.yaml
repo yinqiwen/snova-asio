@@ -40,6 +40,7 @@ jobs:
         with:
           tag : ${{ env.TAG_NAME }}
           release_branches : test_ci
-          token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          create_annotated_tag: true
         env:
           TAG_NAME: nightly_${{ steps.today.outputs.date }}
