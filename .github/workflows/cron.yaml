@@ -35,11 +35,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: nightly_${{ steps.yesterday.outputs.date }}
       - name: Create Tag
-        uses: negz/create-tag@v1
+        uses: laputansoft/github-tag-action@v4.6
         if: always()
         with:
-          version: ${{ env.TAG_NAME }}
-          message: "nightly tag"
+          tag : ${{ env.TAG_NAME }}
+          release_branches : test_ci
           token: ${{ secrets.GITHUB_TOKEN }}
         env:
           TAG_NAME: nightly_${{ steps.today.outputs.date }}
