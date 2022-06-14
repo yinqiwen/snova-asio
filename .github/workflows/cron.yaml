@@ -33,7 +33,7 @@ jobs:
           tag_name: ${{ env.TAG_NAME }} # tag name to delete
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG_NAME: nightly-${{ steps.yesterday.outputs.date }}
+          TAG_NAME: nightly_${{ steps.yesterday.outputs.date }}
       - name: Create Tag
         uses: negz/create-tag@v1
         if: always()
@@ -42,4 +42,4 @@ jobs:
           message: "nightly tag"
           token: ${{ secrets.GITHUB_TOKEN }}
         env:
-          TAG_NAME: nightly-${{ steps.today.outputs.date }}
+          TAG_NAME: nightly_${{ steps.today.outputs.date }}
