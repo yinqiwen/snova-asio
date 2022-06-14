@@ -32,8 +32,8 @@ jobs:
           delete_release: true # default: false
           tag_name: ${{ env.TAG_NAME }} # tag name to delete
           env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            TAG_NAME: nightly-${{ steps.yesterday.outputs.date }}
+            - GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - TAG_NAME: nightly-${{ steps.yesterday.outputs.date }}
       - name: Create Tag
         uses: negz/create-tag@v1
         if: always()
