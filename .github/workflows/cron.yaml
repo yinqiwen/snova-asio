@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Delete Tag
         uses: dev-drprasad/delete-tag-and-release@v0.2.0
-          with:
+        with:
           delete_release: true # default: false
           tag_name: ${{ env.TAG_NAME }} # tag name to delete
           env:
