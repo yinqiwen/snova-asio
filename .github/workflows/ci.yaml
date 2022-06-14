@@ -28,7 +28,7 @@ jobs:
             snova_asio_linux_musl_amd64.tar.gz
             snova_asio_linux_musl_armv5l.tar.gz
   windows_build:
-    runs-on: windows-latest
+    runs-on: windows-2019
     steps:
       - uses: actions/checkout@v3
       - uses: bazelbuild/setup-bazelisk@v2
