@@ -1,4 +1,4 @@
-name: First Cron Job
+name: NightlyTag
 
 on:
   # Triggers the workflow every 5 minutes

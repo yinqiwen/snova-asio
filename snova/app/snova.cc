@@ -88,6 +88,9 @@ int main(int argc, char** argv) {
   app.add_option("--max_iobuf_pool_size", snova::g_iobuf_max_pool_size, "IOBuf pool max size");
   app.add_option("--stream_io_timeout_secs", snova::g_stream_io_timeout_secs,
                  "Proxy stream IO timeout secs, default 300s");
+  uint32_t stat_log_period_secs = 60;
+  app.add_option("--stat_log_period_secs", stat_log_period_secs,
+                 "Print stat log every 'stat_log_period_secs', set it to 0 to disable stat log.");
 
   std::string client_cipher_method = "chacha20_poly1305";
   std::string client_cipher_key = "default cipher key";
@@ -175,7 +178,10 @@ int main(int argc, char** argv) {
                      ::asio::detached);
   }
   init_stats();
-  ::asio::co_spawn(ctx, snova::start_stat_timer(30), ::asio::detached);
+  if (stat_log_period_secs > 0) {
+    ::asio::co_spawn(ctx, snova::start_stat_timer(stat_log_period_secs), ::asio::detached);
+  }
+
   ::asio::co_spawn(ctx, snova::TimeWheel::GetInstance()->Run(), ::asio::detached);
   ctx.run();
   return 0;

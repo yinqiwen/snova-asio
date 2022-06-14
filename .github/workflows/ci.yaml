@@ -1,3 +1,5 @@
+name: CIBuild
+
 on:
   push:
     # Sequence of patterns matched against refs/heads
