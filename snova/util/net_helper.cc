@@ -134,7 +134,6 @@ asio::awaitable<std::error_code> connect_remote_via_http_proxy(
       "CONNECT {}:{} HTTP/1.1\r\nHost: {}:{}\r\nConnection: keep-alive\r\nProxy-Connection: "
       "keep-alive\r\n\r\n",
       remote.address().to_string(), remote.port(), remote.address().to_string(), remote.port());
-  SNOVA_INFO("Write {}", conn_req);
   auto [wec, wn] =
       co_await ::asio::async_write(socket, ::asio::buffer(conn_req.data(), conn_req.size()),
                                    ::asio::experimental::as_tuple(::asio::use_awaitable));
@@ -150,11 +149,12 @@ asio::awaitable<std::error_code> connect_remote_via_http_proxy(
     SNOVA_ERROR("Failed to recv CONNECT response.");
     co_return std::make_error_code(std::errc::connection_refused);
   }
-  std::string_view status((const char*)read_buffer->data(), 3);
-  if (status == "200" || status == "202") {
+  std::string_view response_view((const char*)read_buffer->data(), end_pos);
+  if (absl::StartsWith(response_view, "HTTP/1.1 2") ||
+      absl::StartsWith(response_view, "HTTP/1.0 2")) {
     co_return std::error_code{};
   }
-  SNOVA_ERROR("Recv CONNECT response status:{} from http proxy.", status);
+  SNOVA_ERROR("Recv CONNECT response status:{} from http proxy.", response_view);
   co_return std::make_error_code(std::errc::connection_refused);
 }
 

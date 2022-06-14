@@ -157,14 +157,19 @@ asio::awaitable<void> MuxClient::CheckConnections() {
 }
 
 MuxConnectionPtr MuxClient::SelectConnection() {
-  size_t check_count = 0;
-  while (check_count < remote_conns_.size()) {
-    auto conn = remote_conns_[select_cursor_ % remote_conns_.size()];
-    select_cursor_++;
-    check_count++;
-    if (conn) {
-      return conn;
+  uint32_t min_send_bytes = 0;
+  int32_t select_idx = -1;
+  for (size_t i = 0; i < remote_conns_.size(); i++) {
+    if (!remote_conns_[i]) {
+      continue;
     }
+    if (-1 == select_idx || remote_conns_[i]->GetSendBytes() < min_send_bytes) {
+      select_idx = i;
+      min_send_bytes = remote_conns_[i]->GetSendBytes();
+    }
+  }
+  if (select_idx >= 0) {
+    return remote_conns_[select_idx];
   }
   return nullptr;
 }

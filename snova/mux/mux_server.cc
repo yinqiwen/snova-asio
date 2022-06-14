@@ -34,22 +34,25 @@ std::shared_ptr<MuxServer>& MuxServer::GetInstance() {
   return g_instance;
 }
 EventWriterFactory MuxServer::GetEventWriterFactory(uint64_t client_id) {
-  uint32_t select_cursor = 0;
-  EventWriterFactory f = [client_id, select_cursor, this]() mutable -> EventWriter {
+  EventWriterFactory f = [client_id, this]() mutable -> EventWriter {
     auto found = mux_conns_.find(client_id);
     if (found == mux_conns_.end()) {
       return {};
     }
     auto& conns = found->second;
-    size_t check_count = 0;
-    while (check_count < conns.size()) {
-      uint32_t conn_idx = select_cursor % conns.size();
-      auto conn = conns[conn_idx];
-      select_cursor++;
-      check_count++;
-      if (conn) {
-        return std::bind(&MuxConnection::Write, conn, std::placeholders::_1);
+    uint32_t min_send_bytes = 0;
+    int32_t select_idx = -1;
+    for (size_t i = 0; i < conns.size(); i++) {
+      if (!conns[i]) {
+        continue;
       }
+      if (-1 == select_idx || conns[i]->GetSendBytes() < min_send_bytes) {
+        select_idx = i;
+        min_send_bytes = conns[i]->GetSendBytes();
+      }
+    }
+    if (select_idx >= 0) {
+      return std::bind(&MuxConnection::Write, conns[select_idx], std::placeholders::_1);
     }
     return {};
   };
