@@ -133,19 +133,19 @@ cc_library(
 
     # native.new_local_repository(
     #     name = "armv5l_linux_musleabi",
-    #     path = "/data/CppProj/armv5l-linux-musleabi-cross",
+    #     path = "/opt/musl_gcc_compiles/armv5l-linux-musleabi-cross",
     #     build_file = clean_dep("//:toolchains/armv5l_linux_musleabi.BUILD"),
     # )
 
     # native.new_local_repository(
     #     name = "armv7l_linux_musleabihf",
-    #     path = "/data/CppProj/armv7l-linux-musleabihf-cross",
+    #     path = "/opt/musl_gcc_compiles/armv7l-linux-musleabihf-cross",
     #     build_file = clean_dep("//:toolchains/armv7l_linux_musleabihf.BUILD"),
     # )
 
     # native.new_local_repository(
     #     name = "x64_linux_musl_gcc",
-    #     path = "/data/CppProj/x86_64-linux-musl-native",
+    #     path = "/opt/musl_gcc_compiles/x86_64-linux-musl-native",
     #     build_file = clean_dep("//:toolchains/x86_64-linux-musl.BUILD"),
     # )
 

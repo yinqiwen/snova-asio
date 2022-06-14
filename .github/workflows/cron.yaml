@@ -3,11 +3,7 @@ name: First Cron Job
 on:
   # Triggers the workflow every 5 minutes
   schedule:
-    - cron: "*/5 * * * *"
-  push:
-    # Sequence of patterns matched against refs/heads
-    branches:    
-      - test_ci
+    - cron: "0 3 * * *"
 
      # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -39,7 +35,7 @@ jobs:
         if: always()
         with:
           tag : ${{ env.TAG_NAME }}
-          message: "Latest release"
+          message: "Nightly Release"
           github_token: ${{ secrets.GITHUB_TOKEN }}
         env:
           TAG_NAME: nightly_${{ steps.today.outputs.date }}
