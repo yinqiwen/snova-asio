@@ -52,9 +52,9 @@ asio::awaitable<void> server_relay(uint64_t client_id, std::unique_ptr<MuxEvent>
   auto ex = co_await asio::this_coro::executor;
   EventWriterFactory factory = MuxServer::GetInstance()->GetEventWriterFactory(client_id);
   uint32_t local_stream_id = open_request->head.sid;
-  MuxStreamPtr local_stream = MuxStream::New(std::move(factory), ex, local_stream_id);
-  absl::Cleanup auto_remove_local_stream = [local_stream_id] {
-    MuxStream::Remove(local_stream_id);
+  MuxStreamPtr local_stream = MuxStream::New(std::move(factory), ex, client_id, local_stream_id);
+  absl::Cleanup auto_remove_local_stream = [client_id, local_stream_id] {
+    MuxStream::Remove(client_id, local_stream_id);
   };
 
   if (g_is_middle_node) {

@@ -31,14 +31,14 @@
 #include <random>
 #include <string>
 #include <vector>
+
 #include "CLI/App.hpp"
 #include "CLI/Config.hpp"
 #include "CLI/Formatter.hpp"
-// #include "absl/flags/flag.h"
-// #include "absl/flags/parse.h"
-// #include "absl/flags/usage.h"
-// #include "absl/flags/usage_config.h"
+
 #include "absl/strings/match.h"
+#include "absl/strings/str_split.h"
+
 #include "snova/log/log_macros.h"
 #include "snova/mux/mux_client.h"
 #include "snova/server/local_server.h"
@@ -47,7 +47,7 @@
 #include "snova/util/misc_helper.h"
 #include "snova/util/stat.h"
 #include "snova/util/time_wheel.h"
-#include "spdlog/fmt/bundled/ostream.h"
+
 #include "spdlog/fmt/fmt.h"
 
 #ifndef SNOVA_VERSION
@@ -78,6 +78,8 @@ int main(int argc, char** argv) {
 
   std::string auth_user = "demo_user";
   app.add_option("--user", auth_user, "Auth user name");
+  std::string proxy_server;
+  app.add_option("--proxy", proxy_server, "The proxy server to connect remote server.");
   app.add_option("--remote", snova::g_remote_server, "Remote server address");
   app.add_option("--conn_num_per_server", snova::g_conn_num_per_server,
                  "Remote server connection number per server.");
@@ -102,6 +104,26 @@ int main(int argc, char** argv) {
   app.add_option("--redirect", snova::g_is_redirect_node, "Run as redirect server for entry node.");
 
   CLI11_PARSE(app, argc, argv);
+
+  if (!proxy_server.empty()) {
+    if (!absl::StartsWith(proxy_server, "http://")) {
+      error_exit("Only HTTP proxy supported for '--proxy' now.");
+      return -1;
+    }
+    std::string host_port = proxy_server.substr(7);
+    std::vector<absl::string_view> host_ports = absl::StrSplit(host_port, ':');
+    if (host_ports.size() != 2) {
+      error_exit("Invalid '--proxy' args.");
+      return -1;
+    }
+    try {
+      snova::g_http_proxy_port = std::stoi(std::string(host_ports[1]));
+    } catch (...) {
+      error_exit("Invalid '--proxy' args.");
+      return -1;
+    }
+    snova::g_http_proxy_host = std::string(host_ports[0]);
+  }
 
   if (!snova::g_is_entry_node && !snova::g_is_middle_node && !snova::g_is_exit_node) {
     error_exit("Need to run as entry/middle/exit.");

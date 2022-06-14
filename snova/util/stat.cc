@@ -43,6 +43,7 @@ static std::vector<CollectStatFunc> g_stat_funcs;
 void register_stat_func(CollectStatFunc&& func) { g_stat_funcs.emplace_back(std::move(func)); }
 
 static void print_stats() {
+  g_stat_table.clear();
   for (auto& f : g_stat_funcs) {
     auto stat_vals = f();
     for (const auto& [sec, kvs] : stat_vals) {

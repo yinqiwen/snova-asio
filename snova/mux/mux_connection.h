@@ -68,6 +68,8 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
   uint32_t GetExpireAtUnixSecs() const { return expire_at_unix_secs_; }
   uint64_t GetClientId() const { return client_id_; }
   uint32_t GetLastActiveUnixSecs() const { return last_active_unix_secs_; }
+  uint64_t GetRecvBytes() const { return recv_bytes_; }
+  uint64_t GetSendBytes() const { return send_bytes_; }
   bool IsRetired() const { return retired_; }
   void SetRetired() { retired_ = true; }
 
@@ -104,6 +106,8 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
   uint32_t expire_at_unix_secs_;
   uint32_t last_unmatch_stream_id_;
   uint32_t last_active_unix_secs_;
+  uint64_t recv_bytes_;
+  uint64_t send_bytes_;
   ServerRelayFunc server_relay_;
   RetireCallback retire_callback_;
   bool is_local_;

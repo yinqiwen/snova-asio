@@ -46,6 +46,8 @@ MuxConnection::MuxConnection(::asio::ip::tcp::socket&& sock,
       expire_at_unix_secs_(0),
       last_unmatch_stream_id_(0),
       last_active_unix_secs_(0),
+      recv_bytes_(0),
+      send_bytes_(0),
       is_local_(is_local),
       is_authed_(false),
       retired_(false) {
@@ -170,6 +172,7 @@ asio::awaitable<int> MuxConnection::ReadEvent(std::unique_ptr<MuxEvent>& event) 
       rc = ERR_READ_EOF;
       break;
     }
+    recv_bytes_ += n;
     // SNOVA_INFO("Read {} bytes.", n);
     // readable_data_ = Bytes{read_buffer_.data(), read_pos + n};
     current_read_buffer = absl::MakeSpan(read_buffer_.data(), read_pos + n);
@@ -211,7 +214,7 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
     }
     case EVENT_STREAM_CLOSE: {
       SNOVA_INFO("[{}][{}]Recv stream close event.", idx_, event->head.sid);
-      MuxStreamPtr stream = MuxStream::Get(event->head.sid);
+      MuxStreamPtr stream = MuxStream::Get(client_id_, event->head.sid);
       if (!stream) {
         // SNOVA_ERROR("[{}][{}]No stream found to close.", idx_, event->head.sid);
       } else {
@@ -220,7 +223,7 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
       break;
     }
     case EVENT_STREAM_CHUNK: {
-      MuxStreamPtr stream = MuxStream::Get(event->head.sid);
+      MuxStreamPtr stream = MuxStream::Get(client_id_, event->head.sid);
       if (!stream) {
         if (last_unmatch_stream_id_ != event->head.sid) {
           SNOVA_ERROR("[{}][{}]No stream found to handle chunk with len:{}", idx_, event->head.sid,
@@ -282,6 +285,7 @@ asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev)
     SNOVA_ERROR("Write event:{} failed with error:{}", write_ev->head.type, ec);
     co_return false;
   }
+  send_bytes_ += wbuffer.size();
   co_return true;
 }
 

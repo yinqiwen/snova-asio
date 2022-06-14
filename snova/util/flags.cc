@@ -34,6 +34,8 @@ bool g_is_entry_node = false;
 bool g_is_exit_node = false;
 bool g_is_redirect_node = false;
 std::string g_remote_server;
+std::string g_http_proxy_host;
+uint16_t g_http_proxy_port = 0;
 uint32_t g_conn_num_per_server = 5;
 uint32_t g_iobuf_max_pool_size = 64;
 uint32_t g_stream_io_timeout_secs = 120;

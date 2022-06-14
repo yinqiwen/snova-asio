@@ -64,9 +64,12 @@ static asio::awaitable<void> do_client_relay(T& local_stream, const Bytes& reade
   }
   auto ex = co_await asio::this_coro::executor;
   EventWriterFactory factory = MuxClient::GetEventWriterFactory();
+  uint64_t client_id = MuxClient::GetInstance()->GetClientId();
   uint32_t stream_id = MuxStream::NextID(true);
-  MuxStreamPtr remote_stream = MuxStream::New(std::move(factory), ex, stream_id);
-  absl::Cleanup auto_remove_remove_stream = [stream_id] { MuxStream::Remove(stream_id); };
+  MuxStreamPtr remote_stream = MuxStream::New(std::move(factory), ex, client_id, stream_id);
+  absl::Cleanup auto_remove_remove_stream = [client_id, stream_id] {
+    MuxStream::Remove(client_id, stream_id);
+  };
   auto ec = co_await remote_stream->Open(remote_host, remote_port, is_tcp);
   if (readed_data.size() > 0) {
     IOBufPtr tmp_buf = get_iobuf(readed_data.size());

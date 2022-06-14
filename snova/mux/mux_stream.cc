@@ -34,7 +34,19 @@
 #include "snova/log/log_macros.h"
 #include "spdlog/fmt/bundled/ostream.h"
 namespace snova {
-using MuxStreamTable = absl::flat_hash_map<uint32_t, MuxStreamPtr>;
+
+struct ClientStreamID {
+  uint64_t client_id = 0;
+  uint32_t sid = 0;
+  bool operator==(const ClientStreamID& other) const {
+    return client_id == other.client_id && sid == other.sid;
+  }
+};
+struct ClientStreamIDHasher {
+  std::size_t operator()(const ClientStreamID& k) const { return k.client_id + k.sid; }
+};
+
+using MuxStreamTable = absl::flat_hash_map<ClientStreamID, MuxStreamPtr, ClientStreamIDHasher>;
 static MuxStreamTable g_streams;
 static uint32_t g_active_stream_size = 0;
 static std::atomic<uint32_t> g_client_sid{1};
@@ -50,20 +62,23 @@ uint32_t MuxStream::NextID(bool is_client) {
   return g_server_sid.fetch_add(2);
 }
 MuxStreamPtr MuxStream::New(EventWriterFactory&& factory, StreamDataChannelExecutor& ex,
-                            uint32_t sid) {
+                            uint64_t client_id, uint32_t sid) {
   MuxStreamPtr p(new MuxStream(std::move(factory), ex, sid));
-  g_streams.emplace(sid, p);
+  ClientStreamID id{client_id, sid};
+  g_streams.emplace(id, p);
   return p;
 }
-MuxStreamPtr MuxStream::Get(uint32_t sid) {
-  auto found = g_streams.find(sid);
+MuxStreamPtr MuxStream::Get(uint64_t client_id, uint32_t sid) {
+  ClientStreamID id{client_id, sid};
+  auto found = g_streams.find(id);
   if (found == g_streams.end()) {
     return nullptr;
   }
   return found->second;
 }
-void MuxStream::Remove(uint32_t sid) {
-  g_streams.erase(sid);
+void MuxStream::Remove(uint64_t client_id, uint32_t sid) {
+  ClientStreamID id{client_id, sid};
+  g_streams.erase(id);
   SNOVA_INFO("[{}]Remove stream.", sid);
 }
 

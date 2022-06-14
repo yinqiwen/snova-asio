@@ -51,9 +51,9 @@ class MuxStream : public Stream {
 
   static uint32_t NextID(bool is_client);
   static MuxStreamPtr New(EventWriterFactory&& factory, StreamDataChannelExecutor& ex,
-                          uint32_t sid);
-  static MuxStreamPtr Get(uint32_t sid);
-  static void Remove(uint32_t sid);
+                          uint64_t client_id, uint32_t sid);
+  static MuxStreamPtr Get(uint64_t client_id, uint32_t sid);
+  static void Remove(uint64_t client_id, uint32_t sid);
   static size_t Size();
   static size_t ActiveSize();
 

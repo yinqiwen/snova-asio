@@ -97,6 +97,7 @@ asio::awaitable<void> TimeWheel::Run() {
         time_wheel_[next_idx].emplace_back(std::move(task));
       }
     }
+    routine_queue.clear();
   }
 }
 }  // namespace snova

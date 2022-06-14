@@ -36,7 +36,9 @@
 
 #include "absl/strings/str_split.h"
 #include "asio/experimental/as_tuple.hpp"
+#include "snova/io/read_until.h"
 #include "snova/log/log_macros.h"
+#include "spdlog/fmt/fmt.h"
 
 namespace snova {
 PaserEndpointResult parse_endpoint(const std::string& addr) {
@@ -103,4 +105,57 @@ asio::awaitable<SocketPtr> get_connected_socket(const std::string& host, uint16_
   }
   co_return socket;
 }
+
+asio::awaitable<std::error_code> connect_remote_via_http_proxy(
+    ::asio::ip::tcp::socket& socket, const ::asio::ip::tcp::endpoint& remote,
+    const std::string& proxy_host, uint32_t proxy_port) {
+  auto ex = co_await asio::this_coro::executor;
+  asio::ip::tcp::resolver r(ex);
+  std::string port_str = std::to_string(proxy_port);
+  auto [ec, results] = co_await r.async_resolve(
+      proxy_host, port_str, ::asio::experimental::as_tuple(::asio::use_awaitable));
+
+  if (ec || results.size() == 0) {
+    SNOVA_ERROR("No endpoint found for {}:{} with error:{}", proxy_host, port_str, ec);
+    if (ec) {
+      co_return ec;
+    }
+    co_return std::make_error_code(std::errc::bad_address);
+  }
+  ::asio::ip::tcp::endpoint proxy_endpoint = *(results.begin());
+  auto [connect_ec] = co_await socket.async_connect(
+      proxy_endpoint, ::asio::experimental::as_tuple(::asio::use_awaitable));
+  if (connect_ec) {
+    SNOVA_ERROR("Connect {} with error:{}", proxy_host, connect_ec);
+    co_return connect_ec;
+  }
+
+  std::string conn_req = fmt::format(
+      "CONNECT {}:{} HTTP/1.1\r\nHost: {}:{}\r\nConnection: keep-alive\r\nProxy-Connection: "
+      "keep-alive\r\n\r\n",
+      remote.address().to_string(), remote.port(), remote.address().to_string(), remote.port());
+  SNOVA_INFO("Write {}", conn_req);
+  auto [wec, wn] =
+      co_await ::asio::async_write(socket, ::asio::buffer(conn_req.data(), conn_req.size()),
+                                   ::asio::experimental::as_tuple(::asio::use_awaitable));
+  if (wec) {
+    SNOVA_ERROR("Write CONNECT request failed with error:{}", wec);
+    co_return wec;
+  }
+  std::string_view head_end("\r\n\r\n", 4);
+  IOBufPtr read_buffer = get_iobuf(kMaxChunkSize);
+  size_t readed_len = 0;
+  int end_pos = co_await read_until(socket, *read_buffer, readed_len, head_end);
+  if (end_pos < 0) {
+    SNOVA_ERROR("Failed to recv CONNECT response.");
+    co_return std::make_error_code(std::errc::connection_refused);
+  }
+  std::string_view status((const char*)read_buffer->data(), 3);
+  if (status == "200" || status == "202") {
+    co_return std::error_code{};
+  }
+  SNOVA_ERROR("Recv CONNECT response status:{} from http proxy.", status);
+  co_return std::make_error_code(std::errc::connection_refused);
+}
+
 }  // namespace snova

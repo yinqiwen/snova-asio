@@ -44,4 +44,8 @@ using SocketPtr = std::unique_ptr<::asio::ip::tcp::socket>;
 asio::awaitable<SocketPtr> get_connected_socket(const std::string& host, uint16_t port,
                                                 bool is_tcp);
 
+asio::awaitable<std::error_code> connect_remote_via_http_proxy(
+    ::asio::ip::tcp::socket& socket, const ::asio::ip::tcp::endpoint& remote,
+    const std::string& proxy_host, uint32_t proxy_port);
+
 }  // namespace snova
