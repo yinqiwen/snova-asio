@@ -4,6 +4,8 @@ on:
   # Triggers the workflow every 5 minutes
   schedule:
     - cron: "*/5 * * * *"
+  branches:
+    - test_ci
 
      # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
