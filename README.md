@@ -4,5 +4,24 @@ A lightweight private proxy tool write by c++20 for low-end boxes or embedded de
 
 ## Usage
 
+### Remote Server(Exit Node)
+```bash
+./snova --exit 1 --listen :48100  --server_cipher_key my_test_cipher_key
+```
+
+### Local Server(Entry Node)
+```bash
+./snova --entry 1 --listen :48100  --client_cipher_key my_test_cipher_key --remote <remote_ip>:<remote_port>
+```
+Now you can config the local server 127.0.0.1:48100 as the socks5 proxy for your apps.    
+
+This tool can also run in a router with redirect mode, eg:  
+```bash
+./snova --entry 1 --redirect 1 --listen 192.168.1.1:48100  --client_cipher_key my_test_cipher_key --remote <remote_ip>:<remote_port>
+```
+Now you can config `192.168.1.1:48100` as the iptables redirect target.
+
+### Middle Node(TODO)
+
 
 

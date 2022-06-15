@@ -131,23 +131,23 @@ cc_library(
         ],
     )
 
-    # native.new_local_repository(
-    #     name = "armv5l_linux_musleabi",
-    #     path = "/opt/musl_gcc_compiles/armv5l-linux-musleabi-cross",
-    #     build_file = clean_dep("//:toolchains/armv5l_linux_musleabi.BUILD"),
-    # )
+    native.new_local_repository(
+        name = "local_armv5l_linux_musleabi",
+        path = "/opt/musl_gcc_compiles/armv5l-linux-musleabi-cross",
+        build_file = clean_dep("//:toolchains/armv5l_linux_musleabi.BUILD"),
+    )
 
-    # native.new_local_repository(
-    #     name = "armv7l_linux_musleabihf",
-    #     path = "/opt/musl_gcc_compiles/armv7l-linux-musleabihf-cross",
-    #     build_file = clean_dep("//:toolchains/armv7l_linux_musleabihf.BUILD"),
-    # )
+    native.new_local_repository(
+        name = "local_armv7l_linux_musleabihf",
+        path = "/opt/musl_gcc_compiles/armv7l-linux-musleabihf-cross",
+        build_file = clean_dep("//:toolchains/armv7l_linux_musleabihf.BUILD"),
+    )
 
-    # native.new_local_repository(
-    #     name = "x64_linux_musl_gcc",
-    #     path = "/opt/musl_gcc_compiles/x86_64-linux-musl-native",
-    #     build_file = clean_dep("//:toolchains/x86_64-linux-musl.BUILD"),
-    # )
+    native.new_local_repository(
+        name = "local_x64_linux_musl_gcc",
+        path = "/opt/musl_gcc_compiles/x86_64-linux-musl-native",
+        build_file = clean_dep("//:toolchains/x86_64-linux-musl.BUILD"),
+    )
 
     http_archive(
         name = "armv5l_linux_musleabi",
