@@ -53,6 +53,7 @@ jobs:
         run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
       - uses: bazelbuild/setup-bazelisk@v2
       - name: WindowsX64Build
+        shell: pwsh
         run: 
           bazel.exe build --features=fully_static_link --cxxopt=/O2 --enable_runfiles --cxxopt=/std:c++20 --cxxopt=/DSNOVA_VERSION#"$env:VER_NAME" //...
           tar czf snova_asio_"$env:VER_NAME"_windows_amd64.tar.gz -C ./bazel-bin/snova/app/ snova.exe 
