@@ -113,7 +113,7 @@ static ::asio::awaitable<void> server_loop(::asio::ip::tcp::acceptor server) {
       SNOVA_ERROR("Failed to accept with error:{}", ec.message());
       co_return;
     }
-    SNOVA_INFO("Receive new local connection.");
+    // SNOVA_INFO("Receive new local connection.");
     auto ex = co_await asio::this_coro::executor;
     ::asio::co_spawn(ex, handle_conn(std::move(client)), ::asio::detached);
   }
