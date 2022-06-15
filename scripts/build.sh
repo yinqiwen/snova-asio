@@ -1,6 +1,5 @@
 #!/bin/sh
 
-
 unameOut="$(uname -s)"
 case "${unameOut}" in
     Linux*)     machine=Linux;;
@@ -13,7 +12,7 @@ echo ${machine}
 
 
 if [ "$machine" = "Linux" ]; then
-    bazel build --features=fully_static_link --cxxopt=-std=c++20 --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_x64 //...
+    bazel build --define local_musl=true --features=fully_static_link --cxxopt=-std=c++20 --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_x64 //...
 else
     if [[ $(uname -m) == 'arm64' ]]; then
         bazel build --cxxopt=-std=c++20  //...

@@ -79,7 +79,11 @@ toolchain(
         "@platforms//cpu:x86_64",
         "@platforms//os:linux",
     ],
-    toolchain = "@x64_linux_musl_gcc//:cc_toolchain",
+    # toolchain = "@x64_linux_musl_gcc//:cc_toolchain",
+    toolchain = select({
+        "//:local_musl": "@local_x64_linux_musl_gcc//:cc_toolchain",
+        "//conditions:default": "@x64_linux_musl_gcc//:cc_toolchain",
+    }),
     toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
 )
 
@@ -96,7 +100,10 @@ toolchain(
         ":armv7l",
         "@platforms//os:linux",
     ],
-    toolchain = "@armv7l_linux_musleabihf//:cc_toolchain",
+    toolchain = select({
+        "//:local_musl": "@local_armv7l_linux_musleabihf//:cc_toolchain",
+        "//conditions:default": "@armv7l_linux_musleabihf//:cc_toolchain",
+    }),
     toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
 )
 
@@ -111,6 +118,9 @@ toolchain(
         ":armv5l",
         "@platforms//os:linux",
     ],
-    toolchain = "@armv5l_linux_musleabi//:cc_toolchain",
+    toolchain = select({
+        "//:local_musl": "@local_armv5l_linux_musleabi//:cc_toolchain",
+        "//conditions:default": "@armv5l_linux_musleabi//:cc_toolchain",
+    }),
     toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
 )
