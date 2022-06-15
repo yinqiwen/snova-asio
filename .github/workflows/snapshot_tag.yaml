@@ -18,6 +18,8 @@ jobs:
       - name: Get yesterday date
         id: yesterday
         run: echo "::set-output name=date::$(date -d 'yesterday' '+%Y%m%d')"
+        env:
+          GITHUB_TOKEN: ${{ secrets.TAG_TOKEN }}
       - name: Get today date
         id: today
         run: echo "::set-output name=date::$(date +'%Y%m%d')"
@@ -40,3 +42,4 @@ jobs:
           github_token: ${{ secrets.TAG_TOKEN }}
         env:
           TAG_NAME: latest_build
+          GITHUB_TOKEN: ${{ secrets.TAG_TOKEN }}
