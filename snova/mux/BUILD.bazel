@@ -124,6 +124,7 @@ cc_library(
     deps = [
         ":cipher_context",
         ":mux_stream",
+        "//snova/util:async_mutex",
         "//snova/util:misc_helper",
         "@asio",
     ],

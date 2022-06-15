@@ -17,10 +17,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: bazelbuild/setup-bazelisk@v2
-      - run: bazel build --cxxopt=-std=c++20 --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_x64 //...
+      - run: bazel build --features=fully_static_link --cxxopt=-std=c++20 --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_x64 //...
       - run: tar czf snova_asio_linux_musl_amd64.tar.gz -C ./bazel-bin/snova/app/ snova
       - run: bazel clean --expunge
-      - run: bazel build --cxxopt=-std=c++20 --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_armv5l //...
+      - run: bazel build --features=fully_static_link --cxxopt=-std=c++20 --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_armv5l //...
       - run: tar czf snova_asio_linux_musl_armv5l.tar.gz -C ./bazel-bin/snova/app/ snova
       - name: Release
         uses: softprops/action-gh-release@v1
@@ -34,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: bazelbuild/setup-bazelisk@v2
-      - run: bazel.exe build --cxxopt=/O2 --enable_runfiles --cxxopt=/std:c++20  //...
+      - run: bazel.exe build --features=fully_static_link --cxxopt=/O2 --enable_runfiles --cxxopt=/std:c++20  //...
       - run: tar czf snova_asio_windows_amd64.tar.gz -C ./bazel-bin/snova/app/ snova.exe 
       - name: Release
         uses: softprops/action-gh-release@v1
@@ -46,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: bazelbuild/setup-bazelisk@v2
-      - run: bazel build --cxxopt=-std=c++20  //...
+      - run: bazel build --features=fully_static_link --cxxopt=-std=c++20  //...
       - run: tar czf snova_asio_darwin_amd64.tar.gz -C ./bazel-bin/snova/app/ snova
       - name: Release
         uses: softprops/action-gh-release@v1
