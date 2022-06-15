@@ -5,6 +5,7 @@ on:
     # Sequence of patterns matched against refs/heads
     branches:    
       - dev
+      - main
     # Sequence of patterns matched against refs/tags
     tags:        
       - '*'
@@ -15,69 +16,79 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Get the version
+      - name: Get the tag version
         id: get_version
-        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
+        if: startsWith(github.ref, 'refs/tags/')
+        run: echo "BUILD_VERSION=$(echo $GITHUB_REF | cut -d / -f 3)" >> $GITHUB_ENV
+      - name: Get the commit version
+        if: startsWith(github.ref, 'refs/tags/') != true
+        run: echo "BUILD_VERSION=$(echo $GITHUB_SHA)" >> $GITHUB_ENV
       - uses: bazelbuild/setup-bazelisk@v2
-      - run: bazel build --features=fully_static_link --cxxopt=-std=c++20 --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_x64 //...
-      - name: LinuxX64Archive
-        run: tar czf snova_asio_${VER_NAME}_linux_musl_amd64.tar.gz -C ./bazel-bin/snova/app/ snova
-        env:
-          VER_NAME: ${{ steps.get_version.outputs.VERSION }}
-      - run: bazel clean --expunge
-      - run: bazel build --features=fully_static_link --cxxopt=-std=c++20 --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_armv5l //...
-      - name: LinuxArmv5lArchive
-        run: tar czf snova_asio_${VER_NAME}_linux_musl_armv5l.tar.gz -C ./bazel-bin/snova/app/ snova
-        env:
-          VER_NAME: ${{ steps.get_version.outputs.VERSION }}
+      - name: LinuxX64Build
+        run: |
+          bazel build --features=fully_static_link --cxxopt=-std=c++20 --cxxopt=-DSNOVA_VERSION=${BUILD_VERSION} --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_x64 //...
+          tar czf snova_asio_${BUILD_VERSION}_linux_musl_amd64.tar.gz -C ./bazel-bin/snova/app/ snova
+      - name: LinuxArmv5lBuild
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          bazel clean --expunge
+          bazel build --features=fully_static_link --cxxopt=-std=c++20 --cxxopt=-DSNOVA_VERSION=${BUILD_VERSION} --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_armv5l //...
+          tar czf snova_asio_${BUILD_VERSION}_linux_musl_armv5l.tar.gz -C ./bazel-bin/snova/app/ snova
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            snova_asio_${VER_NAME}_linux_musl_amd64.tar.gz
-            snova_asio_${VER_NAME}_linux_musl_armv5l.tar.gz
-        env:
-          VER_NAME: ${{ steps.get_version.outputs.VERSION }}
+            snova_asio_${BUILD_VERSION}_linux_musl_amd64.tar.gz
+            snova_asio_${BUILD_VERSION}_linux_musl_armv5l.tar.gz
   windows_build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Get the version
+      - name: Get the tag version
         id: get_version
-        shell: bash
-        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          $version = $Env:GITHUB_REF.Split("\")[2]
+          echo "BUILD_VERSION=$version" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
+        shell: pwsh
+      - name: Get the commit version
+        if: startsWith(github.ref, 'refs/tags/') != true
+        run: |
+          $version = $Env:GITHUB_SHA
+          echo "BUILD_VERSION=$version" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
+        shell: pwsh
       - uses: bazelbuild/setup-bazelisk@v2
-      - run: bazel.exe build --features=fully_static_link --cxxopt=/O2 --enable_runfiles --cxxopt=/std:c++20  //...
+      - name: WindowsX64Build
+        run: bazel.exe build --features=fully_static_link --cxxopt=/O2 --enable_runfiles --cxxopt=/std:c++20 --cxxopt=/DSNOVA_VERSION#"$env:BUILD_VERSION" //...
+        shell: pwsh
       - name: WindowsX64Archive
-        run: tar czf snova_asio_${VER_NAME}_windows_amd64.tar.gz -C ./bazel-bin/snova/app/ snova.exe 
-        env:
-          VER_NAME: ${{ steps.get_version.outputs.VERSION }}
+        run: tar czf snova_asio_"$env:BUILD_VERSION"_windows_amd64.tar.gz -C ./bazel-bin/snova/app/ snova.exe 
+        shell: pwsh
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: snova_asio_${VER_NAME}_windows_amd64.tar.gz 
-        env:
-          VER_NAME: ${{ steps.get_version.outputs.VERSION }}
+          files: snova_asio_${BUILD_VERSION}_windows_amd64.tar.gz 
   macos_build:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Get the version
+      - name: Get the tag version
         id: get_version
-        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
+        if: startsWith(github.ref, 'refs/tags/')
+        run: echo "BUILD_VERSION=$(echo $GITHUB_REF | cut -d / -f 3)" >> $GITHUB_ENV
+      - name: Get the commit version
+        if: startsWith(github.ref, 'refs/tags/') != true
+        run: echo "BUILD_VERSION=$(echo $GITHUB_SHA)" >> $GITHUB_ENV
       - uses: bazelbuild/setup-bazelisk@v2
-      - run: bazel build --features=fully_static_link --cxxopt=-std=c++20  //...
-      - name: MacX64Archive
-        run: tar czf snova_asio_${VER_NAME}_darwin_amd64.tar.gz -C ./bazel-bin/snova/app/ snova
-        env:
-          VER_NAME: ${{ steps.get_version.outputs.VERSION }}
+      - name: MacX64Build
+        run: |
+          bazel build --features=fully_static_link --cxxopt=-std=c++20 --cxxopt=-DSNOVA_VERSION=${BUILD_VERSION} //...
+          tar czf snova_asio_${BUILD_VERSION}_darwin_amd64.tar.gz -C ./bazel-bin/snova/app/ snova
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: snova_asio_${VER_NAME}_darwin_amd64.tar.gz 
-        env:
-          VER_NAME: ${{ steps.get_version.outputs.VERSION }}
+          files: snova_asio_${BUILD_VERSION}_darwin_amd64.tar.gz 
   
