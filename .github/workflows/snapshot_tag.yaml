@@ -1,9 +1,10 @@
-name: NightlyTag
+name: SnapshotTag
 
 on:
-  # Triggers the workflow every 5 minutes
-  schedule:
-    - cron: "0 3 * * *"
+  push:
+    # Sequence of patterns matched against refs/heads
+    branches:    
+      - main
 
      # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -29,13 +30,13 @@ jobs:
           tag_name: ${{ env.TAG_NAME }} # tag name to delete
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG_NAME: nightly_${{ steps.yesterday.outputs.date }}
+          TAG_NAME: latest_build
       - name: Create Tag
         uses: rickstaa/action-create-tag@v1
         if: always()
         with:
           tag : ${{ env.TAG_NAME }}
-          message: "Nightly Release"
+          message: "Latest Build Release"
           github_token: ${{ secrets.GITHUB_TOKEN }}
         env:
-          TAG_NAME: nightly_${{ steps.today.outputs.date }}
+          TAG_NAME: latest_build
