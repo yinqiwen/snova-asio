@@ -40,6 +40,7 @@ size_t MuxConnection::ActiveSize() { return g_mux_conn_num_in_loop; }
 MuxConnection::MuxConnection(::asio::ip::tcp::socket&& sock,
                              std::unique_ptr<CipherContext>&& cipher_ctx, bool is_local)
     : socket_(std::move(sock)),
+      write_mutex_(socket_.get_executor()),
       cipher_ctx_(std::move(cipher_ctx)),
       client_id_(0),
       idx_(0),
@@ -267,7 +268,10 @@ asio::awaitable<void> MuxConnection::ReadEventLoop() {
   SNOVA_INFO("Close mux connection:{}, retired:{}", idx_, retired_);
 }
 
-void MuxConnection::Close() { socket_.close(); }
+void MuxConnection::Close() {
+  socket_.close();
+  write_mutex_.Close();
+}
 
 asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev) {
   // SNOVA_INFO("[{}]Write event:{}", write_ev->head.sid, write_ev->head.type);
@@ -278,9 +282,13 @@ asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev)
     SNOVA_ERROR("Encrypt event request:{} with rc:{}", write_ev->head.type, rc);
     co_return false;
   }
+  // is_writing_ = true;
+  co_await write_mutex_.Lock();
   auto [ec, n] =
       co_await ::asio::async_write(socket_, ::asio::buffer(wbuffer.data(), wbuffer.size()),
                                    ::asio::experimental::as_tuple(::asio::use_awaitable));
+  co_await write_mutex_.Unlock();
+  // is_writing_ = false;
   if (ec) {
     SNOVA_ERROR("Write event:{} failed with error:{}", write_ev->head.type, ec);
     co_return false;
