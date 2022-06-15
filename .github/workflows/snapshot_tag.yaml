@@ -25,7 +25,9 @@ jobs:
         id: today
         run: echo "::set-output name=date::$(date +'%Y%m%d')"
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.TAG_TOKEN }}
       - name: Delete Tag
         uses: dev-drprasad/delete-tag-and-release@v0.2.0
         with:
