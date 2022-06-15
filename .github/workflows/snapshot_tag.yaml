@@ -1,10 +1,9 @@
 name: SnapshotTag
 
 on:
-  push:
-    # Sequence of patterns matched against refs/heads
-    branches:    
-      - main
+  # Triggers the workflow every 5 minutes
+  schedule:
+    - cron: "0 12 * * *"
 
      # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -19,8 +18,6 @@ jobs:
       - name: Get yesterday date
         id: yesterday
         run: echo "::set-output name=date::$(date -d 'yesterday' '+%Y%m%d')"
-        env:
-          GITHUB_TOKEN: ${{ secrets.TAG_TOKEN }}
       - name: Get today date
         id: today
         run: echo "::set-output name=date::$(date +'%Y%m%d')"
@@ -35,7 +32,7 @@ jobs:
           tag_name: ${{ env.TAG_NAME }} # tag name to delete
         env:
           GITHUB_TOKEN: ${{ secrets.TAG_TOKEN }}
-          TAG_NAME: latest_build
+          TAG_NAME: snapshot_${{ steps.yesterday.outputs.date }}
       - name: Create Tag
         uses: rickstaa/action-create-tag@v1
         if: always()
@@ -44,5 +41,5 @@ jobs:
           message: "Latest Build Release"
           github_token: ${{ secrets.TAG_TOKEN }}
         env:
-          TAG_NAME: latest_build
+          TAG_NAME: snapshot_${{ steps.today.outputs.date }}
           GITHUB_TOKEN: ${{ secrets.TAG_TOKEN }}
