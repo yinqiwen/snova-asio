@@ -56,26 +56,26 @@ asio::awaitable<std::error_code> AsyncChannelMutex::Unlock() {
   co_return std::error_code{};
 }
 
-AsyncSpinMutex::AsyncSpinMutex(const typename ::asio::steady_timer::executor_type& ex)
-    : locked_(false) {}
-asio::awaitable<std::error_code> AsyncSpinMutex::Lock() {
-  std::chrono::milliseconds wait_period(1);
-  std::unique_ptr<::asio::steady_timer> timer;
-  while (locked_) {
-    if (!timer) {
-      auto ex = co_await asio::this_coro::executor;
-      timer = std::make_unique<::asio::steady_timer>(ex);
-    }
-    timer->expires_after(wait_period);
-    co_await timer->async_wait(::asio::use_awaitable);
-  }
-  locked_ = true;
-  co_return std::error_code{};
-}
-asio::awaitable<std::error_code> AsyncSpinMutex::Unlock() {
-  locked_ = false;
-  co_return std::error_code{};
-}
-void AsyncSpinMutex::Close() {}
+// AsyncSpinMutex::AsyncSpinMutex(const typename ::asio::steady_timer::executor_type& ex)
+//     : locked_(false) {}
+// asio::awaitable<std::error_code> AsyncSpinMutex::Lock() {
+//   std::chrono::milliseconds wait_period(1);
+//   std::unique_ptr<::asio::steady_timer> timer;
+//   while (locked_) {
+//     if (!timer) {
+//       auto ex = co_await asio::this_coro::executor;
+//       timer = std::make_unique<::asio::steady_timer>(ex);
+//     }
+//     timer->expires_after(wait_period);
+//     co_await timer->async_wait(::asio::use_awaitable);
+//   }
+//   locked_ = true;
+//   co_return std::error_code{};
+// }
+// asio::awaitable<std::error_code> AsyncSpinMutex::Unlock() {
+//   locked_ = false;
+//   co_return std::error_code{};
+// }
+// void AsyncSpinMutex::Close() {}
 
 }  // namespace snova

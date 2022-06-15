@@ -275,7 +275,6 @@ void MuxConnection::Close() {
 
 asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev) {
   // SNOVA_INFO("[{}]Write event:{}", write_ev->head.sid, write_ev->head.type);
-  // is_writing_ = true;
   co_await write_mutex_.Lock();
   last_active_unix_secs_ = time(nullptr);
   MutableBytes wbuffer(write_buffer_.data(), write_buffer_.size());
@@ -289,14 +288,13 @@ asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev)
       co_await ::asio::async_write(socket_, ::asio::buffer(wbuffer.data(), wbuffer.size()),
                                    ::asio::experimental::as_tuple(::asio::use_awaitable));
   co_await write_mutex_.Unlock();
-  // is_writing_ = false;
   if (ec) {
     SNOVA_ERROR("Write event:{} failed with error:{}", write_ev->head.type, ec);
     co_return false;
   }
-  if (n != wbuffer.size()) {
-    SNOVA_ERROR("###Expected write {}bytes, but only {} writed.", wbuffer.size(), n);
-  }
+  // if (n != wbuffer.size()) {
+  //   SNOVA_ERROR("###Expected write {}bytes, but only {} writed.", wbuffer.size(), n);
+  // }
   send_bytes_ += wbuffer.size();
   co_return true;
 }
