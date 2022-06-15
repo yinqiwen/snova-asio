@@ -5,6 +5,7 @@ on:
     # Sequence of patterns matched against refs/heads
     branches:    
       - dev
+      - main
     # Sequence of patterns matched against refs/tags
     tags:        
       - '*'
@@ -19,15 +20,18 @@ jobs:
         id: get_version
         run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
       - uses: bazelbuild/setup-bazelisk@v2
-      - run: bazel build --features=fully_static_link --cxxopt=-std=c++20 --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_x64 //...
-      - name: LinuxX64Archive
-        run: tar czf snova_asio_${VER_NAME}_linux_musl_amd64.tar.gz -C ./bazel-bin/snova/app/ snova
+      - name: LinuxX64Build
+        run: |
+          bazel build --features=fully_static_link --cxxopt=-std=c++20 --cxxopt=-DSNOVA_VERSION=${VER_NAME} --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_x64 //...
+          tar czf snova_asio_${VER_NAME}_linux_musl_amd64.tar.gz -C ./bazel-bin/snova/app/ snova
         env:
           VER_NAME: ${{ steps.get_version.outputs.VERSION }}
-      - run: bazel clean --expunge
-      - run: bazel build --features=fully_static_link --cxxopt=-std=c++20 --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_armv5l //...
-      - name: LinuxArmv5lArchive
-        run: tar czf snova_asio_${VER_NAME}_linux_musl_armv5l.tar.gz -C ./bazel-bin/snova/app/ snova
+      - name: LinuxArmv5lBuild
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          bazel clean --expunge
+          bazel build --features=fully_static_link --cxxopt=-std=c++20 --cxxopt=-DSNOVA_VERSION=${VER_NAME} --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_armv5l //...
+          tar czf snova_asio_${VER_NAME}_linux_musl_armv5l.tar.gz -C ./bazel-bin/snova/app/ snova
         env:
           VER_NAME: ${{ steps.get_version.outputs.VERSION }}
       - name: Release
@@ -48,9 +52,10 @@ jobs:
         shell: bash
         run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
       - uses: bazelbuild/setup-bazelisk@v2
-      - run: bazel.exe build --features=fully_static_link --cxxopt=/O2 --enable_runfiles --cxxopt=/std:c++20  //...
-      - name: WindowsX64Archive
-        run: tar czf snova_asio_${VER_NAME}_windows_amd64.tar.gz -C ./bazel-bin/snova/app/ snova.exe 
+      - name: WindowsX64Build
+        run: 
+          bazel.exe build --features=fully_static_link --cxxopt=/O2 --enable_runfiles --cxxopt=/std:c++20 --cxxopt=/DSNOVA_VERSION#"$env:VER_NAME" //...
+          tar czf snova_asio_"$env:VER_NAME"_windows_amd64.tar.gz -C ./bazel-bin/snova/app/ snova.exe 
         env:
           VER_NAME: ${{ steps.get_version.outputs.VERSION }}
       - name: Release
@@ -68,9 +73,10 @@ jobs:
         id: get_version
         run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
       - uses: bazelbuild/setup-bazelisk@v2
-      - run: bazel build --features=fully_static_link --cxxopt=-std=c++20  //...
-      - name: MacX64Archive
-        run: tar czf snova_asio_${VER_NAME}_darwin_amd64.tar.gz -C ./bazel-bin/snova/app/ snova
+      - name: MacX64Build
+        run: |
+          bazel build --features=fully_static_link --cxxopt=-std=c++20 --cxxopt=-DSNOVA_VERSION=${VER_NAME} //...
+          tar czf snova_asio_${VER_NAME}_darwin_amd64.tar.gz -C ./bazel-bin/snova/app/ snova
         env:
           VER_NAME: ${{ steps.get_version.outputs.VERSION }}
       - name: Release

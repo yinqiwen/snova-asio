@@ -50,8 +50,11 @@
 
 #include "spdlog/fmt/fmt.h"
 
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
 #ifndef SNOVA_VERSION
-#define SNOVA_VERSION "unknown"
+#define SNOVA_VERSION unknown
 #endif
 
 static int error_exit(const std::string& error) {
@@ -71,7 +74,7 @@ static void init_stats() {
 
 int main(int argc, char** argv) {
   CLI::App app{"SNOVA:A private proxy tool for low-end boxes."};
-  app.set_version_flag("--version", std::string(SNOVA_VERSION));
+  app.set_version_flag("--version", TOSTRING(SNOVA_VERSION));
   app.set_config("--config", "", "Config file path", false);
   std::string listen = "0.0.0.0:48100";
   app.add_option("--listen", listen, "Listen address");
