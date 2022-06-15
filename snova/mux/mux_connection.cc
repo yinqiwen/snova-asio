@@ -275,15 +275,16 @@ void MuxConnection::Close() {
 
 asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev) {
   // SNOVA_INFO("[{}]Write event:{}", write_ev->head.sid, write_ev->head.type);
+  // is_writing_ = true;
+  co_await write_mutex_.Lock();
   last_active_unix_secs_ = time(nullptr);
   MutableBytes wbuffer(write_buffer_.data(), write_buffer_.size());
   int rc = cipher_ctx_->Encrypt(write_ev, wbuffer);
   if (0 != rc) {
     SNOVA_ERROR("Encrypt event request:{} with rc:{}", write_ev->head.type, rc);
+    co_await write_mutex_.Unlock();
     co_return false;
   }
-  // is_writing_ = true;
-  co_await write_mutex_.Lock();
   auto [ec, n] =
       co_await ::asio::async_write(socket_, ::asio::buffer(wbuffer.data(), wbuffer.size()),
                                    ::asio::experimental::as_tuple(::asio::use_awaitable));
