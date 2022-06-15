@@ -46,14 +46,14 @@ class AsyncChannelMutex {
   bool locked_;
 };
 
-class AsyncSpinMutex {
- public:
-  AsyncSpinMutex(const typename ::asio::steady_timer::executor_type& ex);
-  asio::awaitable<std::error_code> Lock();
-  asio::awaitable<std::error_code> Unlock();
-  void Close();
+// class AsyncSpinMutex {
+//  public:
+//   AsyncSpinMutex(const typename ::asio::steady_timer::executor_type& ex);
+//   asio::awaitable<std::error_code> Lock();
+//   asio::awaitable<std::error_code> Unlock();
+//   void Close();
 
- private:
-  bool locked_;
-};
+//  private:
+//   bool locked_;
+// };
 }  // namespace snova
