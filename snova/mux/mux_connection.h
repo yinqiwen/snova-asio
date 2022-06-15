@@ -98,7 +98,7 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
 
   ::asio::ip::tcp::socket socket_;
   std::unique_ptr<CipherContext> cipher_ctx_;
-  AsyncChannelMutex write_mutex_;
+  AsyncSpinMutex write_mutex_;
 
   std::vector<uint8_t> write_buffer_;
   std::vector<uint8_t> read_buffer_;

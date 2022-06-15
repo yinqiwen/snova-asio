@@ -293,6 +293,9 @@ asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev)
     SNOVA_ERROR("Write event:{} failed with error:{}", write_ev->head.type, ec);
     co_return false;
   }
+  if (n != wbuffer.size()) {
+    SNOVA_ERROR("###Expected write {}bytes, but only {} writed.", wbuffer.size(), n);
+  }
   send_bytes_ += wbuffer.size();
   co_return true;
 }
