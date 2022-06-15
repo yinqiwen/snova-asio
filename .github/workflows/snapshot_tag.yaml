@@ -29,7 +29,7 @@ jobs:
           delete_release: true # default: false
           tag_name: ${{ env.TAG_NAME }} # tag name to delete
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.TAG_TOKEN }}
           TAG_NAME: latest_build
       - name: Create Tag
         uses: rickstaa/action-create-tag@v1
@@ -37,6 +37,6 @@ jobs:
         with:
           tag : ${{ env.TAG_NAME }}
           message: "Latest Build Release"
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.TAG_TOKEN }}
         env:
           TAG_NAME: latest_build
