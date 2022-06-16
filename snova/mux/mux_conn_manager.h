@@ -30,25 +30,41 @@
 #pragma once
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
 #include "asio.hpp"
 #include "snova/mux/mux_connection.h"
 namespace snova {
-class MuxServer {
+struct MuxSession : public std::enable_shared_from_this<MuxSession> {
+  using MuxConnArray = std::vector<MuxConnectionPtr>;
+  MuxConnArray conns;
+  EventWriterFactory GetEventWriterFactory();
+};
+using MuxSessionPtr = std::shared_ptr<MuxSession>;
+struct UserMuxConn {
+  using MuxConnTable = absl::flat_hash_map<uint64_t, MuxSessionPtr>;
+  std::string user;
+  MuxConnTable sessions;
+};
+
+using UserMuxConnPtr = std::shared_ptr<UserMuxConn>;
+
+class MuxConnManager {
  public:
-  static std::shared_ptr<MuxServer>& GetInstance();
+  static std::shared_ptr<MuxConnManager>& GetInstance();
 
-  uint32_t Add(uint64_t client_id, MuxConnectionPtr conn);
-  void Remove(uint64_t client_id, MuxConnectionPtr conn);
-  void Remove(uint64_t client_id, MuxConnection* conn);
+  MuxSessionPtr GetSession(std::string_view user, uint64_t client_id);
+  uint32_t Add(std::string_view user, uint64_t client_id, MuxConnectionPtr conn);
+  void Remove(std::string_view user, uint64_t client_id, MuxConnectionPtr conn);
+  void Remove(std::string_view user, uint64_t client_id, MuxConnection* conn);
 
-  EventWriterFactory GetEventWriterFactory(uint64_t client_id);
+  EventWriterFactory GetEventWriterFactory(std::string_view user, uint64_t client_id);
 
  private:
-  using MuxConnArray = std::vector<MuxConnectionPtr>;
-  using MuxConnTable = absl::flat_hash_map<uint64_t, MuxConnArray>;
-  MuxConnTable mux_conns_;
+  UserMuxConnPtr GetUserMuxConn(std::string_view user);
+  using UserMuxConnTable = absl::flat_hash_map<std::string_view, UserMuxConnPtr>;
+  UserMuxConnTable mux_conns_;
 };
 }  // namespace snova

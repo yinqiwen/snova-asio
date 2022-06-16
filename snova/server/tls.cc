@@ -27,8 +27,8 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/log/log_macros.h"
-#include "snova/server/local_relay.h"
-#include "snova/server/local_server.h"
+#include "snova/server/entry_server.h"
+#include "snova/server/relay.h"
 #include "snova/util/sni.h"
 
 namespace snova {
@@ -46,6 +46,6 @@ asio::awaitable<void> handle_tls_connection(::asio::ip::tcp::socket&& s, IOBufPt
   }
   SNOVA_INFO("Retrive SNI:{} from tls connection.", remote_host);
   uint16_t remote_port = 443;
-  co_await client_relay(std::move(sock), readable_data, remote_host, remote_port, true);
+  co_await relay(std::move(sock), readable_data, remote_host, remote_port, true);
 }
 }  // namespace snova

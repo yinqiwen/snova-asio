@@ -79,7 +79,7 @@ MuxStreamPtr MuxStream::Get(uint64_t client_id, uint32_t sid) {
 void MuxStream::Remove(uint64_t client_id, uint32_t sid) {
   ClientStreamID id{client_id, sid};
   g_streams.erase(id);
-  SNOVA_INFO("[{}]Remove stream.", sid);
+  // SNOVA_INFO("[{}]Remove stream.", sid);
 }
 
 MuxStream::MuxStream(EventWriterFactory&& factory, StreamDataChannelExecutor& ex, uint32_t sid)

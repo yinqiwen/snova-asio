@@ -26,7 +26,7 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "snova/server/remote_server.h"
+#include "snova/server/mux_server.h"
 #include <string_view>
 #include <system_error>
 
@@ -34,55 +34,55 @@
 #include "absl/strings/str_split.h"
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/log/log_macros.h"
+#include "snova/mux/mux_conn_manager.h"
 #include "snova/mux/mux_connection.h"
-#include "snova/mux/mux_server.h"
-#include "snova/server/remote_relay.h"
+#include "snova/server/relay.h"
 #include "snova/util/net_helper.h"
 #include "snova/util/stat.h"
 #include "snova/util/time_wheel.h"
 
 namespace snova {
 static uint32_t g_remote_server_conn_num = 0;
-static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock, std::string cipher_method,
-                                           std::string cipher_key) {
+static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock,
+                                           const std::string& cipher_method,
+                                           const std::string& cipher_key) {
   g_remote_server_conn_num++;
   absl::Cleanup auto_counter = [] { g_remote_server_conn_num--; };
   std::unique_ptr<CipherContext> cipher_ctx = CipherContext::New(cipher_method, cipher_key);
   MuxConnectionPtr mux_conn =
       std::make_shared<MuxConnection>(std::move(sock), std::move(cipher_ctx), false);
-  auto [client_id, auth_success] = co_await mux_conn->ServerAuth();
+  auto [auth_user, client_id, auth_success] = co_await mux_conn->ServerAuth();
   if (!auth_success) {
     SNOVA_ERROR("Server auth failed!");
     co_return;
   }
-  mux_conn->SetServerRelayFunc(server_relay);
-  mux_conn->SetRetireCallback([](MuxConnection* c) {
+  mux_conn->SetRelayHandler(relay_handler);
+  std::string mux_user = std::move(auth_user);
+  mux_conn->SetRetireCallback([mux_user](MuxConnection* c) {
     SNOVA_INFO("[{}]Connection retired!", c->GetIdx());
-    MuxServer::GetInstance()->Remove(c->GetClientId(), c);
+    MuxConnManager::GetInstance()->Remove(mux_user, c->GetClientId(), c);
     auto retired_conn = c->GetShared();
-    TimerTask timer_task;
-    timer_task.timeout_callback = [retired_conn]() -> asio::awaitable<void> {
-      SNOVA_ERROR("[{}]Close retired connection since it's not active since {}s ago.",
-                  retired_conn->GetIdx(), time(nullptr) - retired_conn->GetLastActiveUnixSecs());
-      retired_conn->Close();
-      co_return;
-    };
-    timer_task.get_active_time = [retired_conn]() -> uint32_t {
-      return retired_conn->GetLastActiveUnixSecs();
-    };
-    timer_task.timeout_secs = 60;
-    TimeWheel::GetInstance()->Register(std::move(timer_task));
+    TimeWheel::GetInstance()->Add(
+        [retired_conn]() -> asio::awaitable<void> {
+          SNOVA_ERROR("[{}]Close retired connection since it's not active since {}s ago.",
+                      retired_conn->GetIdx(),
+                      time(nullptr) - retired_conn->GetLastActiveUnixSecs());
+          retired_conn->Close();
+          co_return;
+        },
+        [retired_conn]() -> uint32_t { return retired_conn->GetLastActiveUnixSecs(); }, 60);
   });
-  uint32_t idx = MuxServer::GetInstance()->Add(client_id, mux_conn);
+  uint32_t idx = MuxConnManager::GetInstance()->Add(mux_user, client_id, mux_conn);
   mux_conn->SetIdx(idx);
   auto ex = co_await asio::this_coro::executor;
   co_await mux_conn->ReadEventLoop();
   mux_conn->Close();
-  MuxServer::GetInstance()->Remove(client_id, mux_conn);
+  MuxConnManager::GetInstance()->Remove(mux_user, client_id, mux_conn);
 }
 
 static ::asio::awaitable<void> server_loop(::asio::ip::tcp::acceptor server,
-                                           std::string cipher_method, std::string cipher_key) {
+                                           const std::string& cipher_method,
+                                           const std::string& cipher_key) {
   while (true) {
     auto [ec, client] =
         co_await server.async_accept(::asio::experimental::as_tuple(::asio::use_awaitable));
@@ -98,9 +98,9 @@ static ::asio::awaitable<void> server_loop(::asio::ip::tcp::acceptor server,
   co_return;
 }
 
-asio::awaitable<std::error_code> start_remote_server(const std::string& addr,
-                                                     const std::string& cipher_method,
-                                                     const std::string& cipher_key) {
+asio::awaitable<std::error_code> start_mux_server(const std::string& addr,
+                                                  const std::string& cipher_method,
+                                                  const std::string& cipher_key) {
   SNOVA_INFO("Start listen on address [{}] with cipher_method:{}", addr, cipher_method);
   register_stat_func([]() -> StatValues {
     StatValues vals;

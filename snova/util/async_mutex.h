@@ -39,6 +39,8 @@ class AsyncChannelMutex {
   asio::awaitable<std::error_code> Lock();
   asio::awaitable<std::error_code> Unlock();
   void Close();
+  size_t GetWaitCount() const { return wait_count_; }
+  bool IsLocked() const { return locked_; }
 
  private:
   asio::experimental::channel<void(std::error_code, bool)> channel_;

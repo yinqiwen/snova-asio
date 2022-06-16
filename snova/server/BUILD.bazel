@@ -9,23 +9,22 @@ package(
 )
 
 cc_library(
-    name = "local_server",
+    name = "entry_server",
     srcs = [
+        "entry_server.cc",
         "http.cc",
-        "local_server.cc",
         "socks5.cc",
         "tls.cc",
     ],
     hdrs = [
-        "local_server.h",
+        "entry_server.h",
     ],
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
-        ":local_relay",
+        ":relay",
         "//snova/io",
         "//snova/io:read_until",
         "//snova/log:log_api",
-        "//snova/mux:mux_client",
         "//snova/util:flags",
         "//snova/util:http_helper",
         "//snova/util:net_helper",
@@ -38,20 +37,20 @@ cc_library(
 )
 
 cc_library(
-    name = "remote_server",
+    name = "mux_server",
     srcs = [
-        "remote_server.cc",
+        "mux_server.cc",
     ],
     hdrs = [
-        "remote_server.h",
+        "mux_server.h",
     ],
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
-        ":remote_relay",
+        ":relay",
         "//snova/io",
         "//snova/log:log_api",
+        "//snova/mux:mux_conn_manager",
         "//snova/mux:mux_connection",
-        "//snova/mux:mux_server",
         "//snova/util:net_helper",
         "//snova/util:time_wheel",
         "@asio",
@@ -61,42 +60,21 @@ cc_library(
 )
 
 cc_library(
-    name = "local_relay",
+    name = "relay",
     srcs = [
-        "local_relay.cc",
+        "relay.cc",
     ],
     hdrs = [
-        "local_relay.h",
+        "relay.h",
     ],
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
         "//snova/io:transfer",
         "//snova/log:log_api",
         "//snova/mux:mux_client",
+        "//snova/mux:mux_event",
         "//snova/util:flags",
         "//snova/util:time_wheel",
-        "@asio",
-        "@com_google_absl//absl/cleanup",
-    ],
-)
-
-cc_library(
-    name = "remote_relay",
-    srcs = [
-        "remote_relay.cc",
-    ],
-    hdrs = [
-        "remote_relay.h",
-    ],
-    copts = SNOVA_DEFAULT_COPTS,
-    deps = [
-        ":local_relay",
-        "//snova/io",
-        "//snova/io:transfer",
-        "//snova/log:log_api",
-        "//snova/mux:mux_event",
-        "//snova/mux:mux_server",
-        "//snova/mux:mux_stream",
         "@asio",
         "@com_google_absl//absl/cleanup",
     ],

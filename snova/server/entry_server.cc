@@ -26,7 +26,7 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "snova/server/local_server.h"
+#include "snova/server/entry_server.h"
 #include <string_view>
 #include <system_error>
 
@@ -37,7 +37,7 @@
 #include "absl/strings/str_split.h"
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/log/log_macros.h"
-#include "snova/server/local_relay.h"
+#include "snova/server/relay.h"
 #include "snova/util/flags.h"
 #include "snova/util/net_helper.h"
 #include "snova/util/stat.h"
@@ -96,8 +96,8 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
     if (remote_endpoint) {
       // just relay to remote
       SNOVA_INFO("Redirect proxy connection to {}.", *remote_endpoint);
-      co_await client_relay(std::move(sock), readable, remote_endpoint->address().to_string(),
-                            remote_endpoint->port(), true);
+      co_await relay(std::move(sock), readable, remote_endpoint->address().to_string(),
+                     remote_endpoint->port(), true);
     } else {
       // no remote host&port to relay
     }
@@ -120,7 +120,7 @@ static ::asio::awaitable<void> server_loop(::asio::ip::tcp::acceptor server) {
   co_return;
 }
 
-asio::awaitable<std::error_code> start_local_server(const std::string& addr) {
+asio::awaitable<std::error_code> start_entry_server(const std::string& addr) {
   PaserEndpointResult parse_result = parse_endpoint(addr);
   if (parse_result.second) {
     co_return parse_result.second;
