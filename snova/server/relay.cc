@@ -93,9 +93,9 @@ static asio::awaitable<void> do_relay(T& local_stream, const Bytes& readed_data,
       } catch (std::exception& ex) {
         SNOVA_ERROR("ex:{}", ex.what());
       }
-      if (cancel_transfer_timeout) {
-        cancel_transfer_timeout();
-      }
+    }
+    if (cancel_transfer_timeout) {
+      cancel_transfer_timeout();
     }
     co_return;
   } else {
