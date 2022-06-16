@@ -141,14 +141,14 @@ asio::awaitable<void> relay(StreamPtr local_stream, const Bytes& readed_data,
 
 asio::awaitable<void> relay_handler(const std::string& auth_user, uint64_t client_id,
                                     std::unique_ptr<MuxEvent>&& event) {
-  StreamOpenRequest* open_request = dynamic_cast<StreamOpenRequest*>(event.get());
   std::unique_ptr<MuxEvent> mux_event =
       std::move(event);  // this make rvalue event not release after co_await
+  auto ex = co_await asio::this_coro::executor;
+  StreamOpenRequest* open_request = dynamic_cast<StreamOpenRequest*>(mux_event.get());
   if (nullptr == open_request) {
     SNOVA_ERROR("null request for EVENT_STREAM_OPEN");
     co_return;
   }
-  auto ex = co_await asio::this_coro::executor;
   EventWriterFactory factory =
       MuxConnManager::GetInstance()->GetEventWriterFactory(auth_user, client_id);
   uint32_t local_stream_id = open_request->head.sid;

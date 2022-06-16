@@ -43,8 +43,9 @@
 
 namespace snova {
 static uint32_t g_remote_server_conn_num = 0;
-static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock, std::string cipher_method,
-                                           std::string cipher_key) {
+static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock,
+                                           const std::string& cipher_method,
+                                           const std::string& cipher_key) {
   g_remote_server_conn_num++;
   absl::Cleanup auto_counter = [] { g_remote_server_conn_num--; };
   std::unique_ptr<CipherContext> cipher_ctx = CipherContext::New(cipher_method, cipher_key);
@@ -80,7 +81,8 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock, std::st
 }
 
 static ::asio::awaitable<void> server_loop(::asio::ip::tcp::acceptor server,
-                                           std::string cipher_method, std::string cipher_key) {
+                                           const std::string& cipher_method,
+                                           const std::string& cipher_key) {
   while (true) {
     auto [ec, client] =
         co_await server.async_accept(::asio::experimental::as_tuple(::asio::use_awaitable));
