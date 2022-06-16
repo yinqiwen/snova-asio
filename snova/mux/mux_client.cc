@@ -43,7 +43,7 @@ std::shared_ptr<MuxClient>& MuxClient::GetInstance() {
 }
 
 asio::awaitable<std::error_code> MuxClient::NewConnection(uint32_t idx) {
-  if (idx >= remote_conns_.size()) {
+  if (idx >= remote_session_->conns.size()) {
     co_return std::make_error_code(std::errc::invalid_argument);
   }
   auto ex = co_await asio::this_coro::executor;
@@ -78,18 +78,20 @@ asio::awaitable<std::error_code> MuxClient::NewConnection(uint32_t idx) {
       [this, idx, conn]() -> asio::awaitable<void> {
         co_await conn->ReadEventLoop();
         if (!conn->IsRetired()) {
-          remote_conns_[idx] = nullptr;
+          remote_session_->conns[idx] = nullptr;
         }
         co_return;
       },
       ::asio::detached);
-  remote_conns_[idx] = conn;
+  remote_session_->conns[idx] = conn;
   co_return std::error_code{};
 }
 asio::awaitable<std::error_code> MuxClient::Init(const std::string& user,
                                                  const std::string& cipher_method,
                                                  const std::string& cipher_key) {
-  remote_conns_.resize(g_conn_num_per_server);
+  // remote_conns_.resize(g_conn_num_per_server);
+  remote_session_ = MuxConnManager::GetInstance()->GetSession(auth_user_, client_id_);
+  remote_session_->conns.resize(g_conn_num_per_server);
   PaserEndpointResult parse_result = parse_endpoint(g_remote_server);
   if (parse_result.second) {
     co_return parse_result.second;
@@ -124,16 +126,17 @@ asio::awaitable<void> MuxClient::CheckConnections() {
     timer.expires_after(period);
     co_await timer.async_wait(::asio::experimental::as_tuple(::asio::use_awaitable));
     for (uint32_t i = 0; i < g_conn_num_per_server; i++) {
-      if (!remote_conns_[i]) {
+      auto& conn = remote_session_->conns[i];
+      if (!conn) {
         co_await NewConnection(i);
       } else {
         uint32_t now = time(nullptr);
-        if (now > remote_conns_[i]->GetExpireAtUnixSecs()) {
+        if (now > conn->GetExpireAtUnixSecs()) {
           SNOVA_INFO("[{}]Try to retire connection since now:{}, retire time:{}", i, now,
-                     remote_conns_[i]->GetExpireAtUnixSecs());
-          auto retired_conn = remote_conns_[i];
+                     conn->GetExpireAtUnixSecs());
+          auto retired_conn = conn;
           retired_conn->SetRetired();
-          remote_conns_[i] = nullptr;
+          conn = nullptr;
           auto retire_event = std::make_unique<RetireConnRequest>();
           co_await retired_conn->WriteEvent(std::move(retire_event));
           auto timeout_callback = [retired_conn]() -> asio::awaitable<void> {
@@ -155,55 +158,26 @@ asio::awaitable<void> MuxClient::CheckConnections() {
   co_return;
 }
 
-MuxConnectionPtr MuxClient::SelectConnection() {
-  uint32_t min_send_bytes = 0;
-  int32_t select_idx = -1;
-  for (size_t i = 0; i < remote_conns_.size(); i++) {
-    if (!remote_conns_[i]) {
-      continue;
-    }
-    if (-1 == select_idx || remote_conns_[i]->GetSendBytes() < min_send_bytes) {
-      select_idx = i;
-      min_send_bytes = remote_conns_[i]->GetSendBytes();
-    }
-  }
-  if (select_idx >= 0) {
-    return remote_conns_[select_idx];
-  }
-  return nullptr;
-}
-
 void MuxClient::SetClientId(uint64_t client_id) { client_id_ = client_id; }
 
 EventWriterFactory MuxClient::GetEventWriterFactory() {
-  EventWriterFactory f = []() -> EventWriter {
-    MuxConnectionPtr conn = MuxClient::GetInstance()->SelectConnection();
-    if (!conn) {
-      return {};
-    }
-    uint32_t conn_idx = conn->GetIdx();
-    return [conn_idx](std::unique_ptr<MuxEvent>&& event) -> asio::awaitable<bool> {
-      auto write_conn = MuxClient::GetInstance()->remote_conns_[conn_idx];
-      if (write_conn) {
-        co_return co_await write_conn->Write(std::move(event));
-      }
-      co_return false;
-    };
-  };
-  return f;
+  return remote_session_->GetEventWriterFactory();
 }
 
 void MuxClient::ReportStatInfo(StatValues& stats) {
+  if (!remote_session_) {
+    return;
+  }
   auto& kv = stats["MuxClient"];
   uint32_t now = time(nullptr);
-  for (size_t i = 0; i < remote_conns_.size(); i++) {
-    if (!remote_conns_[i]) {
+  for (size_t i = 0; i < remote_session_->conns.size(); i++) {
+    auto& conn = remote_session_->conns[i];
+    if (!conn) {
       kv[fmt::format("[{}]", i)] = "NULL";
     } else {
-      kv[fmt::format("[{}]inactive_secs", i)] =
-          std::to_string(now - remote_conns_[i]->GetLastActiveUnixSecs());
-      kv[fmt::format("[{}]recv_bytes", i)] = std::to_string(remote_conns_[i]->GetRecvBytes());
-      kv[fmt::format("[{}]send_bytes", i)] = std::to_string(remote_conns_[i]->GetSendBytes());
+      kv[fmt::format("[{}]inactive_secs", i)] = std::to_string(now - conn->GetLastActiveUnixSecs());
+      kv[fmt::format("[{}]recv_bytes", i)] = std::to_string(conn->GetRecvBytes());
+      kv[fmt::format("[{}]send_bytes", i)] = std::to_string(conn->GetSendBytes());
     }
   }
 }

@@ -31,9 +31,8 @@
 #include "absl/strings/strip.h"
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/log/log_macros.h"
-#include "snova/server/local_relay.h"
-#include "snova/server/local_server.h"
-#include "spdlog/fmt/bundled/ostream.h"
+#include "snova/server/entry_server.h"
+#include "snova/server/relay.h"
 
 namespace snova {
 static constexpr uint8_t kMethodNoAuth = 0;
@@ -141,6 +140,6 @@ asio::awaitable<void> handle_socks5_connection(::asio::ip::tcp::socket&& s, IOBu
     Bytes client_hello(read_buffer.data(), rn);
     co_await handle_tls_connection(std::move(sock), std::move(conn_read_buffer), client_hello);
   }
-  co_await client_relay(std::move(sock), Bytes{}, remote_host, remote_port, true);
+  co_await relay(std::move(sock), Bytes{}, remote_host, remote_port, true);
 }
 }  // namespace snova

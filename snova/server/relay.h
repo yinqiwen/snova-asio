@@ -28,9 +28,19 @@
  */
 
 #pragma once
-#include "asio.hpp"
-#include "snova/mux/mux_event.h"
-namespace snova {
 
-asio::awaitable<void> server_relay(uint64_t client_id, std::unique_ptr<MuxEvent>&& open_request);
-}
+#include <string_view>
+#include "asio.hpp"
+#include "snova/io/io.h"
+#include "snova/mux/mux_event.h"
+#include "snova/mux/mux_stream.h"
+
+namespace snova {
+asio::awaitable<void> relay(::asio::ip::tcp::socket&& sock, const Bytes& readed_data,
+                            const std::string& remote_host, uint16_t remote_port, bool is_tcp);
+asio::awaitable<void> relay(StreamPtr stream, const Bytes& readed_data,
+                            const std::string& remote_host, uint16_t remote_port, bool is_tcp);
+
+asio::awaitable<void> relay_handler(const std::string& user, uint64_t client_id,
+                                    std::unique_ptr<MuxEvent>&& open_request);
+}  // namespace snova

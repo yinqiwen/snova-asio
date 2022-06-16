@@ -63,7 +63,7 @@ MuxConnection::~MuxConnection() { g_mux_conn_num--; }
 asio::awaitable<ServerAuthResult> MuxConnection::ServerAuth() {
   if (is_local_) {
     SNOVA_ERROR("No need to auth connection for client connection.");
-    co_return ServerAuthResult{0, false};
+    co_return ServerAuthResult{"", 0, false};
   }
   std::unique_ptr<MuxEvent> auth_req;
   int rc = co_await ReadEvent(auth_req);
@@ -71,12 +71,12 @@ asio::awaitable<ServerAuthResult> MuxConnection::ServerAuth() {
     SNOVA_ERROR(
         "Oops! Read auth request failed with rc:{}, maybe the client cipher config is invalid.",
         rc);
-    co_return ServerAuthResult{0, false};
+    co_return ServerAuthResult{"", 0, false};
   }
   AuthRequest* auth_req_event = dynamic_cast<AuthRequest*>(auth_req.get());
   if (nullptr == auth_req_event) {
     SNOVA_ERROR("Recv non auth reqeust with type:{}", auth_req->head.type);
-    co_return ServerAuthResult{0, false};
+    co_return ServerAuthResult{"", 0, false};
   }
   uint64_t iv = random_uint64(0, 102 * 1024 * 1024LL);
   // absl::BitGen bitgen;
@@ -89,7 +89,8 @@ asio::awaitable<ServerAuthResult> MuxConnection::ServerAuth() {
     cipher_ctx_->UpdateNonce(iv);
   }
   client_id_ = auth_req_event->client_id;
-  co_return ServerAuthResult{auth_req_event->client_id, write_success};
+  auth_user_ = auth_req_event->user;
+  co_return ServerAuthResult{auth_req_event->user, auth_req_event->client_id, write_success};
 }
 
 asio::awaitable<bool> MuxConnection::ClientAuth(const std::string& user, uint64_t client_id) {
@@ -127,6 +128,7 @@ asio::awaitable<bool> MuxConnection::ClientAuth(const std::string& user, uint64_
     is_authed_ = true;
     // SNOVA_INFO("Success to recv auth response.");
   }
+  auth_user_ = user;
   co_return success;
 }
 int MuxConnection::ReadEventFromBuffer(std::unique_ptr<MuxEvent>& event, Bytes& buffer) {
@@ -208,7 +210,8 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
       //            open_request->remote_host, open_request->remote_port, open_request->is_tcp);
       if (server_relay_) {
         auto ex = co_await asio::this_coro::executor;
-        ::asio::co_spawn(ex, server_relay_(client_id_, std::move(event)), ::asio::detached);
+        ::asio::co_spawn(ex, server_relay_(auth_user_, client_id_, std::move(event)),
+                         ::asio::detached);
       } else {
         SNOVA_ERROR("No server relay fun to handle EVENT_STREAM_OPEN");
       }
@@ -302,6 +305,36 @@ asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev)
   }
   send_bytes_ += wbuffer.size();
   co_return true;
+}
+
+int MuxConnection::ComparePriority(const MuxConnection& other) const {
+  if (write_mutex_.GetWaitCount() < other.write_mutex_.GetWaitCount()) {
+    return 1;
+  }
+  if (write_mutex_.GetWaitCount() > other.write_mutex_.GetWaitCount()) {
+    return -1;
+  }
+  if (!write_mutex_.IsLocked() && other.write_mutex_.IsLocked()) {
+    return 1;
+  }
+  if (!write_mutex_.IsLocked() && !other.write_mutex_.IsLocked()) {
+    return -1;
+  }
+
+  if ((last_active_unix_secs_ + 10) < other.last_active_unix_secs_) {
+    return 1;
+  }
+  if ((other.last_active_unix_secs_ + 10) < last_active_unix_secs_) {
+    return -1;
+  }
+
+  if (GetSendBytes() < other.GetSendBytes()) {
+    return 1;
+  }
+  if (GetSendBytes() > other.GetSendBytes()) {
+    return -1;
+  }
+  return 0;
 }
 
 }  // namespace snova

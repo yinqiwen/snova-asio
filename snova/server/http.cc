@@ -34,10 +34,9 @@
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/io/read_until.h"
 #include "snova/log/log_macros.h"
-#include "snova/server/local_relay.h"
-#include "snova/server/local_server.h"
+#include "snova/server/entry_server.h"
+#include "snova/server/relay.h"
 #include "snova/util/http_helper.h"
-#include "spdlog/fmt/bundled/ostream.h"
 
 namespace snova {
 
@@ -91,14 +90,14 @@ asio::awaitable<void> handle_http_connection(::asio::ip::tcp::socket&& s, IOBufP
     co_await ::asio::async_write(sock, ::asio::buffer(conn_ok.data(), conn_ok.size()),
                                  ::asio::experimental::as_tuple(::asio::use_awaitable));
     // tunnel
-    co_await client_relay(std::move(sock), Bytes{}, std::string(host_view.data(), host_view.size()),
-                          remote_port, true);
+    co_await relay(std::move(sock), Bytes{}, std::string(host_view.data(), host_view.size()),
+                   remote_port, true);
   } else {
     if (remote_port == 0) {
       remote_port = 80;
     }
-    co_await client_relay(std::move(sock), readable_data,
-                          std::string(host_view.data(), host_view.size()), remote_port, true);
+    co_await relay(std::move(sock), readable_data, std::string(host_view.data(), host_view.size()),
+                   remote_port, true);
   }
   co_return;
 

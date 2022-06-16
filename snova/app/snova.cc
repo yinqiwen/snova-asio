@@ -41,8 +41,8 @@
 
 #include "snova/log/log_macros.h"
 #include "snova/mux/mux_client.h"
-#include "snova/server/local_server.h"
-#include "snova/server/remote_server.h"
+#include "snova/server/entry_server.h"
+#include "snova/server/mux_server.h"
 #include "snova/util/flags.h"
 #include "snova/util/misc_helper.h"
 #include "snova/util/stat.h"
@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
   std::string auth_user = "demo_user";
   app.add_option("--user", auth_user, "Auth user name");
   std::string proxy_server;
-  app.add_option("--proxy", proxy_server, "The proxy server to connect remote server.");
+  app.add_option("--proxy", proxy_server, "The proxy server to connect mux server.");
   app.add_option("--remote", snova::g_remote_server, "Remote server address");
   app.add_option("--conn_num_per_server", snova::g_conn_num_per_server,
                  "Remote server connection number per server.");
@@ -166,18 +166,17 @@ int main(int argc, char** argv) {
           }
           auto ex = co_await asio::this_coro::executor;
           if (snova::g_is_entry_node) {
-            ::asio::co_spawn(ex, snova::start_local_server(listen), ::asio::detached);
+            ::asio::co_spawn(ex, snova::start_entry_server(listen), ::asio::detached);
           } else {
             ::asio::co_spawn(
-                ctx, snova::start_remote_server(listen, server_cipher_method, server_cipher_key),
+                ctx, snova::start_mux_server(listen, server_cipher_method, server_cipher_key),
                 ::asio::detached);
           }
         },
         ::asio::detached);
   }
   if (snova::g_is_exit_node) {
-    ::asio::co_spawn(ctx,
-                     snova::start_remote_server(listen, server_cipher_method, server_cipher_key),
+    ::asio::co_spawn(ctx, snova::start_mux_server(listen, server_cipher_method, server_cipher_key),
                      ::asio::detached);
   }
   init_stats();

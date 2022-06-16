@@ -46,8 +46,9 @@
 #include "snova/util/async_mutex.h"
 
 namespace snova {
-using ServerAuthResult = std::pair<uint64_t, bool>;
-using ServerRelayFunc = std::function<asio::awaitable<void>(uint64_t, std::unique_ptr<MuxEvent>&&)>;
+using ServerAuthResult = std::tuple<std::string, uint64_t, bool>;
+using RelayHandler =
+    std::function<asio::awaitable<void>(const std::string&, uint64_t, std::unique_ptr<MuxEvent>&&)>;
 class MuxConnection;
 using RetireCallback = std::function<void(MuxConnection*)>;
 using MuxConnectionPtr = std::shared_ptr<MuxConnection>;
@@ -62,7 +63,7 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
   asio::awaitable<void> ReadEventLoop();
   MuxConnectionPtr GetShared() { return shared_from_this(); }
 
-  void SetServerRelayFunc(ServerRelayFunc&& f) { server_relay_ = std::move(f); }
+  void SetRelayHandler(RelayHandler&& f) { server_relay_ = std::move(f); }
   void SetRetireCallback(RetireCallback&& f) { retire_callback_ = std::move(f); }
   void SetIdx(uint32_t idx) { idx_ = idx; }
   uint32_t GetIdx() const { return idx_; }
@@ -73,6 +74,8 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
   uint64_t GetSendBytes() const { return send_bytes_; }
   bool IsRetired() const { return retired_; }
   void SetRetired() { retired_ = true; }
+
+  int ComparePriority(const MuxConnection& other) const;
 
   ~MuxConnection();
   template <typename T>
@@ -103,6 +106,7 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
   std::vector<uint8_t> write_buffer_;
   std::vector<uint8_t> read_buffer_;
   Bytes readable_data_;
+  std::string auth_user_;
   uint64_t client_id_;
   uint32_t idx_;
   uint32_t expire_at_unix_secs_;
@@ -110,7 +114,7 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
   uint32_t last_active_unix_secs_;
   uint64_t recv_bytes_;
   uint64_t send_bytes_;
-  ServerRelayFunc server_relay_;
+  RelayHandler server_relay_;
   RetireCallback retire_callback_;
   bool is_local_;
   bool is_authed_;

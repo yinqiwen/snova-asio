@@ -19,7 +19,7 @@ cc_library(
     ],
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
-        ":mux_connection",
+        ":mux_conn_manager",
         "//snova/io",
         "//snova/log:log_api",
         "//snova/util:flags",
@@ -32,22 +32,22 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "mux_server",
-    srcs = [
-        "mux_server.cc",
-    ],
-    hdrs = [
-        "mux_server.h",
-    ],
-    copts = SNOVA_DEFAULT_COPTS,
-    deps = [
-        ":mux_connection",
-        "//snova/log:log_api",
-        "@asio",
-        "@com_google_absl//absl/container:flat_hash_map",
-    ],
-)
+# cc_library(
+#     name = "mux_server",
+#     srcs = [
+#         "mux_server.cc",
+#     ],
+#     hdrs = [
+#         "mux_server.h",
+#     ],
+#     copts = SNOVA_DEFAULT_COPTS,
+#     deps = [
+#         ":mux_connection",
+#         "//snova/log:log_api",
+#         "@asio",
+#         "@com_google_absl//absl/container:flat_hash_map",
+#     ],
+# )
 
 cc_library(
     name = "cipher_context",
@@ -128,5 +128,19 @@ cc_library(
         "//snova/util:misc_helper",
         "//snova/util:time_wheel",
         "@asio",
+    ],
+)
+
+cc_library(
+    name = "mux_conn_manager",
+    srcs = [
+        "mux_conn_manager.cc",
+    ],
+    hdrs = [
+        "mux_conn_manager.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        ":mux_connection",
     ],
 )
