@@ -76,22 +76,20 @@ static asio::awaitable<void> do_client_relay(T& local_stream, const Bytes& reade
     memcpy(tmp_buf->data(), readed_data.data(), readed_data.size());
     co_await remote_stream->Write(std::move(tmp_buf), readed_data.size());
   }
+
   TransferRoutineFunc transfer_routine;
   uint32_t latest_io_time = time(nullptr);
-  TimerTaskID transfer_timeout_task_id;
+  CancelFunc cancel_transfer_timeout;
   if (g_stream_io_timeout_secs > 0) {
     transfer_routine = [&]() { latest_io_time = time(nullptr); };
-    TimerTask timer_task;
-    timer_task.timeout_callback = [&]() -> asio::awaitable<void> {
-      SNOVA_ERROR("[{}]Close stream since it's not active since {}s ago.", stream_id,
-                  time(nullptr) - latest_io_time);
-      co_await remote_stream->Close(false);
-      co_return;
-    };
-    timer_task.get_active_time = [&]() -> uint32_t { return latest_io_time; };
-    timer_task.id_update_cb = [&](TimerTaskID& id) { transfer_timeout_task_id = id; };
-    timer_task.timeout_secs = g_stream_io_timeout_secs;
-    transfer_timeout_task_id = TimeWheel::GetInstance()->Register(std::move(timer_task));
+    cancel_transfer_timeout = TimeWheel::GetInstance()->Add(
+        [&]() -> asio::awaitable<void> {
+          SNOVA_ERROR("[{}]Close stream since it's not active since {}s ago.", stream_id,
+                      time(nullptr) - latest_io_time);
+          co_await remote_stream->Close(false);
+          co_return;
+        },
+        [&]() -> uint32_t { return latest_io_time; }, g_stream_io_timeout_secs);
   }
 
   try {
@@ -100,8 +98,8 @@ static asio::awaitable<void> do_client_relay(T& local_stream, const Bytes& reade
   } catch (std::exception& ex) {
     SNOVA_ERROR("ex:{}", ex.what());
   }
-  if (g_stream_io_timeout_secs > 0) {
-    TimeWheel::GetInstance()->Cancel(transfer_timeout_task_id);
+  if (cancel_transfer_timeout) {
+    cancel_transfer_timeout();
   }
 
   co_await remote_stream->Close(false);

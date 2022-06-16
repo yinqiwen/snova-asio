@@ -30,6 +30,7 @@
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/util/flags.h"
 #include "snova/util/misc_helper.h"
+#include "snova/util/time_wheel.h"
 #include "spdlog/fmt/bundled/ostream.h"
 
 namespace snova {
@@ -284,17 +285,21 @@ asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev)
     co_await write_mutex_.Unlock();
     co_return false;
   }
+  auto cancel_write_timeout = TimeWheel::GetInstance()->Add(
+      [this]() -> asio::awaitable<void> {
+        this->Close();
+        co_return;
+      },
+      g_tcp_write_timeout_secs);
   auto [ec, n] =
       co_await ::asio::async_write(socket_, ::asio::buffer(wbuffer.data(), wbuffer.size()),
                                    ::asio::experimental::as_tuple(::asio::use_awaitable));
+  cancel_write_timeout();
   co_await write_mutex_.Unlock();
   if (ec) {
     SNOVA_ERROR("Write event:{} failed with error:{}", write_ev->head.type, ec);
     co_return false;
   }
-  // if (n != wbuffer.size()) {
-  //   SNOVA_ERROR("###Expected write {}bytes, but only {} writed.", wbuffer.size(), n);
-  // }
   send_bytes_ += wbuffer.size();
   co_return true;
 }

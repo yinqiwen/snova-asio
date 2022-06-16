@@ -29,6 +29,7 @@
 
 #pragma once
 #include <functional>
+#include <memory>
 #include <utility>
 #include <vector>
 #include "asio.hpp"
@@ -36,26 +37,23 @@
 namespace snova {
 using TimeoutFunc = std::function<asio::awaitable<void>()>;
 using GetActiveTimeFunc = std::function<uint32_t()>;
-using TimerTaskID = std::pair<uint32_t, uint32_t>;
-using IDUpdateFunc = std::function<void(TimerTaskID&)>;
-struct TimerTask {
-  TimeoutFunc timeout_callback;
-  GetActiveTimeFunc get_active_time;
-  IDUpdateFunc id_update_cb;
-  uint32_t timeout_secs = 0;
-  bool canceled = false;
-};
+using CancelFunc = std::function<void()>;
+
+struct TimerTask;
+using TimerTaskPtr = std::shared_ptr<TimerTask>;
 
 class TimeWheel {
  public:
   static std::shared_ptr<TimeWheel>& GetInstance();
   TimeWheel(uint32_t max_timeout_secs = 600);
-  TimerTaskID Register(TimerTask&& task);
-  void Cancel(const TimerTaskID& id);
+  CancelFunc Add(TimeoutFunc&& func, GetActiveTimeFunc&& active, uint32_t timeout_secs);
+  CancelFunc Add(TimeoutFunc&& func, uint32_t timeout_secs);
+
   asio::awaitable<void> Run();
 
  private:
-  using TimerTaskQueue = std::vector<TimerTask>;
+  CancelFunc DoRegister(TimerTaskPtr& task);
+  using TimerTaskQueue = std::vector<TimerTaskPtr>;
   using TimeWheelQueue = std::vector<TimerTaskQueue>;
   TimeWheelQueue time_wheel_;
   uint32_t max_timeout_secs_;

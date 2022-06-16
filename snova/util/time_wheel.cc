@@ -34,6 +34,14 @@
 #include "snova/util/flags.h"
 
 namespace snova {
+
+struct TimerTask {
+  TimeoutFunc timeout_callback;
+  GetActiveTimeFunc get_active_time;
+  uint32_t timeout_secs = 0;
+  bool canceled = false;
+};
+
 std::shared_ptr<TimeWheel>& TimeWheel::GetInstance() {
   static std::shared_ptr<TimeWheel> g_instance =
       std::make_shared<TimeWheel>(g_stream_io_timeout_secs + 1);
@@ -43,29 +51,37 @@ std::shared_ptr<TimeWheel>& TimeWheel::GetInstance() {
 TimeWheel::TimeWheel(uint32_t max_timeout_secs) : max_timeout_secs_(max_timeout_secs) {
   time_wheel_.resize(max_timeout_secs);
 }
-TimerTaskID TimeWheel::Register(TimerTask&& task) {
-  if (task.timeout_secs == 0) {
-    task.timeout_secs = max_timeout_secs_ / 2;
-  }
-  if (task.timeout_secs > max_timeout_secs_) {
-    task.timeout_secs = max_timeout_secs_;
-  }
-  uint32_t now = time(nullptr);
-  uint32_t idx = (now + task.timeout_secs) % time_wheel_.size();
-  time_wheel_[idx].emplace_back(std::move(task));
 
-  return TimerTaskID{idx, time_wheel_[idx].size() - 1};
+CancelFunc TimeWheel::Add(TimeoutFunc&& func, GetActiveTimeFunc&& active, uint32_t timeout_secs) {
+  TimerTaskPtr task = std::make_shared<TimerTask>();
+  task->timeout_callback = std::move(func);
+  task->get_active_time = std::move(active);
+  task->timeout_secs = timeout_secs;
+  return DoRegister(task);
+}
+CancelFunc TimeWheel::Add(TimeoutFunc&& func, uint32_t timeout_secs) {
+  TimerTaskPtr task = std::make_shared<TimerTask>();
+  task->timeout_callback = std::move(func);
+  task->timeout_secs = timeout_secs;
+  return DoRegister(task);
 }
 
-void TimeWheel::Cancel(const TimerTaskID& id) {
-  auto& queue = time_wheel_[id.first];
-  if (id.second >= queue.size()) {
-    return;
+CancelFunc TimeWheel::DoRegister(TimerTaskPtr& task) {
+  if (task->timeout_secs == 0) {
+    task->timeout_secs = max_timeout_secs_ / 2;
   }
-  queue[id.second].timeout_callback = {};
-  queue[id.second].get_active_time = {};
-  queue[id.second].id_update_cb = {};
-  queue[id.second].canceled = true;
+  if (task->timeout_secs > max_timeout_secs_) {
+    task->timeout_secs = max_timeout_secs_;
+  }
+  uint32_t now = time(nullptr);
+  uint32_t idx = (now + task->timeout_secs) % time_wheel_.size();
+  auto cancel_func = [task]() {
+    task->canceled = true;
+    task->timeout_callback = {};
+    task->get_active_time = {};
+  };
+  time_wheel_[idx].emplace_back(task);
+  return cancel_func;
 }
 
 asio::awaitable<void> TimeWheel::Run() {
@@ -82,18 +98,14 @@ asio::awaitable<void> TimeWheel::Run() {
     }
     TimerTaskQueue routine_queue = std::move(time_wheel_[idx]);
     for (auto& task : routine_queue) {
-      if (task.canceled) {
+      if (task->canceled) {
         continue;
       }
-      uint32_t active_time = task.get_active_time();
-      if (now - active_time > task.timeout_secs) {
-        co_await task.timeout_callback();
+      uint32_t active_time = task->get_active_time();
+      if (now - active_time > task->timeout_secs) {
+        co_await task->timeout_callback();
       } else {
-        uint32_t next_idx = ((active_time + task.timeout_secs + 1) % time_wheel_.size());
-        TimerTaskID new_id{next_idx, time_wheel_[next_idx].size()};
-        if (task.id_update_cb) {
-          task.id_update_cb(new_id);
-        }
+        uint32_t next_idx = ((active_time + task->timeout_secs + 1) % time_wheel_.size());
         time_wheel_[next_idx].emplace_back(std::move(task));
       }
     }

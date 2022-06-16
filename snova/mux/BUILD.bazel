@@ -126,6 +126,7 @@ cc_library(
         ":mux_stream",
         "//snova/util:async_mutex",
         "//snova/util:misc_helper",
+        "//snova/util:time_wheel",
         "@asio",
     ],
 )
