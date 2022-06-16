@@ -42,12 +42,12 @@
 #include "snova/util/time_wheel.h"
 
 namespace snova {
-static uint32_t g_remote_server_conn_num = 0;
+static uint32_t g_mux_server_conn_num = 0;
 static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock,
                                            const std::string& cipher_method,
                                            const std::string& cipher_key) {
-  g_remote_server_conn_num++;
-  absl::Cleanup auto_counter = [] { g_remote_server_conn_num--; };
+  g_mux_server_conn_num++;
+  absl::Cleanup auto_counter = [] { g_mux_server_conn_num--; };
   std::unique_ptr<CipherContext> cipher_ctx = CipherContext::New(cipher_method, cipher_key);
   MuxConnectionPtr mux_conn =
       std::make_shared<MuxConnection>(std::move(sock), std::move(cipher_ctx), false);
@@ -104,8 +104,8 @@ asio::awaitable<std::error_code> start_mux_server(const std::string& addr,
   SNOVA_INFO("Start listen on address [{}] with cipher_method:{}", addr, cipher_method);
   register_stat_func([]() -> StatValues {
     StatValues vals;
-    auto& kv = vals["RemoteServer"];
-    kv["remote_server_conn_num"] = std::to_string(g_remote_server_conn_num);
+    auto& kv = vals["MuxServer"];
+    kv["mux_server_conn_num"] = std::to_string(g_mux_server_conn_num);
     return vals;
   });
   std::unique_ptr<CipherContext> cipher_ctx = CipherContext::New(cipher_method, cipher_key);

@@ -67,7 +67,7 @@ static asio::awaitable<void> do_relay(T& local_stream, const Bytes& readed_data,
   if (g_stream_io_timeout_secs > 0) {
     transfer_routine = [&]() { latest_io_time = time(nullptr); };
     cancel_transfer_timeout = TimeWheel::GetInstance()->Add(
-        [&]() -> asio::awaitable<void> {
+        [stream_id, &latest_io_time, close_local]() -> asio::awaitable<void> {
           SNOVA_ERROR("[{}]Close stream since it's not active since {}s ago.", stream_id,
                       time(nullptr) - latest_io_time);
           //   co_await remote_stream->Close(false);
