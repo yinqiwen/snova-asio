@@ -56,9 +56,10 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock, std::st
     co_return;
   }
   mux_conn->SetRelayHandler(relay_handler);
-  mux_conn->SetRetireCallback([auth_user](MuxConnection* c) {
+  std::string mux_user = std::move(auth_user);
+  mux_conn->SetRetireCallback([mux_user](MuxConnection* c) {
     SNOVA_INFO("[{}]Connection retired!", c->GetIdx());
-    MuxConnManager::GetInstance()->Remove(auth_user, c->GetClientId(), c);
+    MuxConnManager::GetInstance()->Remove(mux_user, c->GetClientId(), c);
     auto retired_conn = c->GetShared();
     TimeWheel::GetInstance()->Add(
         [retired_conn]() -> asio::awaitable<void> {
@@ -70,12 +71,12 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock, std::st
         },
         [retired_conn]() -> uint32_t { return retired_conn->GetLastActiveUnixSecs(); }, 60);
   });
-  uint32_t idx = MuxConnManager::GetInstance()->Add(auth_user, client_id, mux_conn);
+  uint32_t idx = MuxConnManager::GetInstance()->Add(mux_user, client_id, mux_conn);
   mux_conn->SetIdx(idx);
   auto ex = co_await asio::this_coro::executor;
   co_await mux_conn->ReadEventLoop();
   mux_conn->Close();
-  MuxConnManager::GetInstance()->Remove(auth_user, client_id, mux_conn);
+  MuxConnManager::GetInstance()->Remove(mux_user, client_id, mux_conn);
 }
 
 static ::asio::awaitable<void> server_loop(::asio::ip::tcp::acceptor server,
