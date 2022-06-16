@@ -39,6 +39,7 @@ struct TimerTask {
   TimeoutFunc timeout_callback;
   GetActiveTimeFunc get_active_time;
   uint32_t timeout_secs = 0;
+  uint32_t create_time = 0;
   bool canceled = false;
 };
 
@@ -74,6 +75,7 @@ CancelFunc TimeWheel::DoRegister(TimerTaskPtr& task) {
     task->timeout_secs = max_timeout_secs_;
   }
   uint32_t now = time(nullptr);
+  task->create_time = now;
   uint32_t idx = (now + task->timeout_secs) % time_wheel_.size();
   auto cancel_func = [task]() {
     task->canceled = true;
@@ -101,7 +103,10 @@ asio::awaitable<void> TimeWheel::Run() {
       if (task->canceled) {
         continue;
       }
-      uint32_t active_time = task->get_active_time();
+      uint32_t active_time = task->create_time;
+      if (task->get_active_time) {
+        active_time = task->get_active_time();
+      }
       if (now - active_time > task->timeout_secs) {
         co_await task->timeout_callback();
       } else {

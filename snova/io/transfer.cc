@@ -29,8 +29,7 @@
 #include "snova/io/transfer.h"
 #include <vector>
 #include "asio/experimental/as_tuple.hpp"
-#include "snova/log/log_macros.h"
-#include "spdlog/fmt/bundled/ostream.h"
+
 namespace snova {
 using namespace asio::experimental::awaitable_operators;
 
@@ -39,7 +38,7 @@ asio::awaitable<void> transfer(StreamPtr from, StreamPtr to, const TransferRouti
     auto [data, len, ec] = co_await from->Read();
     if (ec) {
       // co_await from->Close(false);
-      SNOVA_ERROR("Read ERROR {} {}", len, ec);
+      // SNOVA_ERROR("Read ERROR {} {}", len, ec);
       break;
     }
     if (routine) {
@@ -48,7 +47,7 @@ asio::awaitable<void> transfer(StreamPtr from, StreamPtr to, const TransferRouti
     auto wec = co_await to->Write(std::move(data), len);
     if (wec) {
       // co_await from->Close(false);
-      SNOVA_ERROR("async_write ERROR {} ", wec);
+      // SNOVA_ERROR("async_write ERROR {} ", wec);
       break;
     }
     if (routine) {
@@ -64,7 +63,7 @@ asio::awaitable<void> transfer(StreamPtr from, SocketRef to, const TransferRouti
     auto [data, len, ec] = co_await from->Read();
     if (ec) {
       // co_await from->Close(false);
-      SNOVA_ERROR("[{}]Read ERROR {}", from->GetID(), ec);
+      // SNOVA_ERROR("[{}]Read ERROR {}", from->GetID(), ec);
       break;
     }
     if (routine) {
@@ -76,7 +75,7 @@ asio::awaitable<void> transfer(StreamPtr from, SocketRef to, const TransferRouti
     data.reset();
     if (wec) {
       // co_await from->Close(false);
-      SNOVA_ERROR("async_write ERROR {} ", wec);
+      // SNOVA_ERROR("async_write ERROR {} ", wec);
       break;
     }
     if (routine) {
