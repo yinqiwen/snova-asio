@@ -165,44 +165,4 @@ EventWriterFactory MuxClient::GetEventWriterFactory() {
   return remote_session_->GetEventWriterFactory();
 }
 
-void MuxClient::ReportStatInfo(StatValues& stats) {
-  if (!remote_session_) {
-    return;
-  }
-  auto& kv = stats["MuxClient"];
-  uint32_t now = time(nullptr);
-  for (size_t i = 0; i < remote_session_->conns.size(); i++) {
-    auto& conn = remote_session_->conns[i];
-    if (!conn) {
-      kv[fmt::format("[{}]", i)] = "NULL";
-    } else {
-      kv[fmt::format("[{}]read_state", i)] = conn->GetReadState();
-      kv[fmt::format("[{}]inactive_secs", i)] = std::to_string(now - conn->GetLastActiveUnixSecs());
-      kv[fmt::format("[{}]recv_bytes", i)] = std::to_string(conn->GetRecvBytes());
-      kv[fmt::format("[{}]send_bytes", i)] = std::to_string(conn->GetSendBytes());
-      kv[fmt::format("[{}]latest_30s_recv_bytes", i)] =
-          std::to_string(conn->GetLatestWindowRecvBytes());
-      kv[fmt::format("[{}]latest_30s_send_bytes", i)] =
-          std::to_string(conn->GetLatestWindowSendBytes());
-    }
-  }
-}
-
-void register_mux_stat() {
-  register_stat_func([]() -> StatValues {
-    StatValues vals;
-    auto& kv = vals["Mux"];
-    kv["stream_num"] = std::to_string(MuxStream::Size());
-    kv["stream_active_num"] = std::to_string(MuxStream::ActiveSize());
-    kv["connection_num"] = std::to_string(MuxConnection::Size());
-    kv["connection_active_num"] = std::to_string(MuxConnection::ActiveSize());
-    return vals;
-  });
-  register_stat_func([]() -> StatValues {
-    StatValues vals;
-    MuxClient::GetInstance()->ReportStatInfo(vals);
-    return vals;
-  });
-}
-
 }  // namespace snova

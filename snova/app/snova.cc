@@ -69,7 +69,7 @@ static int error_exit(const std::string& error) {
 
 static void init_stats() {
   snova::register_io_stat();
-  snova::register_mux_stat();
+  snova::MuxConnManager::GetInstance()->RegisterStat();
 }
 
 int main(int argc, char** argv) {
