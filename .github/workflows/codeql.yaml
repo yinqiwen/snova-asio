@@ -67,7 +67,7 @@ jobs:
     - uses: bazelbuild/setup-bazelisk@v2
     - run: |
        echo "Run, Build Application using script"
-       ./script/build.sh
+       ./scripts/build.sh
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v2
