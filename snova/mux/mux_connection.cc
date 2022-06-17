@@ -79,6 +79,13 @@ MuxConnection::MuxConnection(::asio::ip::tcp::socket&& sock,
   latest_window_recv_bytes_.resize(30);
   latest_window_send_bytes_.resize(30);
 }
+
+void MuxConnection::ResetCounter(uint32_t now) {
+  for (uint32_t i = 0; i < 3; i++) {
+    latest_window_recv_bytes_[(now + 1 + i) % latest_window_recv_bytes_.size()] = 0;
+    latest_window_send_bytes_[(now + 1 + i) % latest_window_send_bytes_.size()] = 0;
+  }
+}
 std::string MuxConnection::GetReadState() const {
   switch (read_state_) {
     RETURN_CASE(STATE_INIT)
@@ -226,10 +233,7 @@ asio::awaitable<int> MuxConnection::ReadEvent(std::unique_ptr<MuxEvent>& event) 
       break;
     }
     auto now = time(nullptr);
-    if (now != last_active_read_unix_secs_) {
-      latest_window_recv_bytes_[now % latest_window_recv_bytes_.size()] = 0;
-      last_active_read_unix_secs_ = now;
-    }
+    last_active_read_unix_secs_ = now;
     latest_window_recv_bytes_[now % latest_window_recv_bytes_.size()] += n;
     recv_bytes_ += n;
     // SNOVA_INFO("Read {} bytes.", n);
@@ -345,10 +349,7 @@ asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev)
   co_await write_mutex_.Lock();
   // co_await write_mutex_.lock_async();
   auto now = time(nullptr);
-  if (now != last_active_write_unix_secs_) {
-    latest_window_send_bytes_[now % latest_window_send_bytes_.size()] = 0;
-    last_active_write_unix_secs_ = now;
-  }
+  last_active_write_unix_secs_ = now;
   MutableBytes wbuffer(write_buffer_.data(), write_buffer_.size());
   int rc = cipher_ctx_->Encrypt(write_ev, wbuffer);
   if (0 != rc) {

@@ -131,6 +131,7 @@ asio::awaitable<void> MuxClient::CheckConnections() {
         co_await NewConnection(i);
       } else {
         uint32_t now = time(nullptr);
+        conn->ResetCounter(now);
         if (now > conn->GetExpireAtUnixSecs()) {
           SNOVA_INFO("[{}]Try to retire connection since now:{}, retire time:{}", i, now,
                      conn->GetExpireAtUnixSecs());

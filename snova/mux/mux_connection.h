@@ -81,6 +81,7 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
   uint64_t GetLatestWindowRecvBytes() const;
   uint64_t GetLatestWindowSendBytes() const;
   std::string GetReadState() const;
+  void ResetCounter(uint32_t now);
 
   int ComparePriority(const MuxConnection& other) const;
 
