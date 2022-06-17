@@ -28,12 +28,29 @@
  */
 #include "snova/mux/mux_connection.h"
 #include "asio/experimental/as_tuple.hpp"
+#include "asio/experimental/promise.hpp"
 #include "snova/util/flags.h"
 #include "snova/util/misc_helper.h"
 #include "snova/util/time_wheel.h"
-#include "spdlog/fmt/bundled/ostream.h"
+
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#define RETURN_CASE(STATE)  \
+  case STATE: {             \
+    return TOSTRING(STATE); \
+  }
 
 namespace snova {
+
+enum MuxConnReadState {
+  STATE_INIT = 0,
+  STATE_READING,
+  STATE_READED,
+  STATE_CLOSING_STREAM,
+  STATE_OFFER_CHUNK,
+  STATE_READ_LOOP_EXIT,
+};
+
 static uint32_t g_mux_conn_num = 0;
 static uint32_t g_mux_conn_num_in_loop = 0;
 size_t MuxConnection::Size() { return g_mux_conn_num; }
@@ -47,9 +64,11 @@ MuxConnection::MuxConnection(::asio::ip::tcp::socket&& sock,
       idx_(0),
       expire_at_unix_secs_(0),
       last_unmatch_stream_id_(0),
-      last_active_unix_secs_(0),
+      last_active_write_unix_secs_(0),
+      last_active_read_unix_secs_(0),
       recv_bytes_(0),
       send_bytes_(0),
+      read_state_(0),
       is_local_(is_local),
       is_authed_(false),
       retired_(false) {
@@ -57,7 +76,37 @@ MuxConnection::MuxConnection(::asio::ip::tcp::socket&& sock,
   read_buffer_.resize(2 * kMaxChunkSize);
   g_mux_conn_num++;
   expire_at_unix_secs_ = (time(nullptr) + g_connection_expire_secs + random_uint64(0, 60));
+  latest_window_recv_bytes_.resize(30);
+  latest_window_send_bytes_.resize(30);
 }
+std::string MuxConnection::GetReadState() const {
+  switch (read_state_) {
+    RETURN_CASE(STATE_INIT)
+    RETURN_CASE(STATE_READING)
+    RETURN_CASE(STATE_READED)
+    RETURN_CASE(STATE_CLOSING_STREAM)
+    RETURN_CASE(STATE_OFFER_CHUNK)
+    RETURN_CASE(STATE_READ_LOOP_EXIT)
+    default: {
+      return "unknown:" + std::to_string(read_state_);
+    }
+  }
+}
+uint64_t MuxConnection::GetLatestWindowRecvBytes() const {
+  uint64_t n = 0;
+  for (const auto v : latest_window_recv_bytes_) {
+    n += v;
+  }
+  return n;
+}
+uint64_t MuxConnection::GetLatestWindowSendBytes() const {
+  uint64_t n = 0;
+  for (const auto v : latest_window_send_bytes_) {
+    n += v;
+  }
+  return n;
+}
+
 MuxConnection::~MuxConnection() { g_mux_conn_num--; }
 
 asio::awaitable<ServerAuthResult> MuxConnection::ServerAuth() {
@@ -176,6 +225,12 @@ asio::awaitable<int> MuxConnection::ReadEvent(std::unique_ptr<MuxEvent>& event) 
       rc = ERR_READ_EOF;
       break;
     }
+    auto now = time(nullptr);
+    if (now != last_active_read_unix_secs_) {
+      latest_window_recv_bytes_[now % latest_window_recv_bytes_.size()] = 0;
+      last_active_read_unix_secs_ = now;
+    }
+    latest_window_recv_bytes_[now % latest_window_recv_bytes_.size()] += n;
     recv_bytes_ += n;
     // SNOVA_INFO("Read {} bytes.", n);
     // readable_data_ = Bytes{read_buffer_.data(), read_pos + n};
@@ -187,7 +242,9 @@ asio::awaitable<int> MuxConnection::ReadEvent(std::unique_ptr<MuxEvent>& event) 
 
 asio::awaitable<int> MuxConnection::ProcessReadEvent() {
   std::unique_ptr<MuxEvent> event;
+  read_state_ = STATE_READING;
   int rc = co_await ReadEvent(event);
+  read_state_ = STATE_READED;
   if (0 != rc) {
     co_return rc;
   }
@@ -237,6 +294,7 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
           last_unmatch_stream_id_ = event->head.sid;
           auto close_ev = std::make_unique<StreamCloseRequest>();
           close_ev->head.sid = event->head.sid;
+          read_state_ = STATE_CLOSING_STREAM;
           co_await WriteEvent(std::move(close_ev));
         }
       } else {
@@ -245,6 +303,7 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
           SNOVA_ERROR("null chunk for EVENT_STREAM_CHUNK");
           co_return - 1;
         }
+        read_state_ = STATE_OFFER_CHUNK;
         co_await stream->Offer(std::move(chunk->chunk), chunk->chunk_len);
       }
       break;
@@ -265,8 +324,8 @@ asio::awaitable<void> MuxConnection::ReadEventLoop() {
     if (0 != rc && ERR_NEED_MORE_INPUT_DATA != rc) {
       break;
     }
-    last_active_unix_secs_ = time(nullptr);
   }
+  read_state_ = STATE_READ_LOOP_EXIT;
   Close();
   g_mux_conn_num_in_loop--;
   SNOVA_INFO("Close mux connection:{}, retired:{}", idx_, retired_);
@@ -279,18 +338,28 @@ void MuxConnection::Close() {
 
 asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev) {
   // SNOVA_INFO("[{}]Write event:{}", write_ev->head.sid, write_ev->head.type);
+  // bool locked = write_mutex_.IsLocked();
+  // if (locked) {
+  //   SNOVA_INFO("######[{}]Write locked.", write_ev->head.sid);
+  // }
   co_await write_mutex_.Lock();
-  last_active_unix_secs_ = time(nullptr);
+  // co_await write_mutex_.lock_async();
+  auto now = time(nullptr);
+  if (now != last_active_write_unix_secs_) {
+    latest_window_send_bytes_[now % latest_window_send_bytes_.size()] = 0;
+    last_active_write_unix_secs_ = now;
+  }
   MutableBytes wbuffer(write_buffer_.data(), write_buffer_.size());
   int rc = cipher_ctx_->Encrypt(write_ev, wbuffer);
   if (0 != rc) {
     SNOVA_ERROR("Encrypt event request:{} with rc:{}", write_ev->head.type, rc);
     co_await write_mutex_.Unlock();
+    // co_await write_mutex_.unlock();
     co_return false;
   }
   auto cancel_write_timeout = TimeWheel::GetInstance()->Add(
       [this]() -> asio::awaitable<void> {
-        this->Close();
+        socket_.close();
         co_return;
       },
       g_tcp_write_timeout_secs);
@@ -299,11 +368,13 @@ asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev)
                                    ::asio::experimental::as_tuple(::asio::use_awaitable));
   cancel_write_timeout();
   co_await write_mutex_.Unlock();
+  // co_await write_mutex_.unlock();
   if (ec) {
     SNOVA_ERROR("Write event:{} failed with error:{}", write_ev->head.type, ec);
     co_return false;
   }
   send_bytes_ += wbuffer.size();
+  latest_window_send_bytes_[now % latest_window_send_bytes_.size()] += wbuffer.size();
   co_return true;
 }
 
@@ -317,21 +388,16 @@ int MuxConnection::ComparePriority(const MuxConnection& other) const {
   if (!write_mutex_.IsLocked() && other.write_mutex_.IsLocked()) {
     return 1;
   }
-  if (!write_mutex_.IsLocked() && !other.write_mutex_.IsLocked()) {
+  if (write_mutex_.IsLocked() && !other.write_mutex_.IsLocked()) {
     return -1;
   }
 
-  if ((last_active_unix_secs_ + 10) < other.last_active_unix_secs_) {
+  uint64_t latest_send_bytes = GetLatestWindowSendBytes();
+  uint64_t other_latest_send_bytes = other.GetLatestWindowSendBytes();
+  if (latest_send_bytes < other_latest_send_bytes) {
     return 1;
   }
-  if ((other.last_active_unix_secs_ + 10) < last_active_unix_secs_) {
-    return -1;
-  }
-
-  if (GetSendBytes() < other.GetSendBytes()) {
-    return 1;
-  }
-  if (GetSendBytes() > other.GetSendBytes()) {
+  if (latest_send_bytes > other_latest_send_bytes) {
     return -1;
   }
   return 0;

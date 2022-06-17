@@ -58,7 +58,8 @@ class MuxStream : public Stream {
   static size_t ActiveSize();
 
  private:
-  MuxStream(EventWriterFactory&& factory, StreamDataChannelExecutor& ex, uint32_t sid);
+  MuxStream(EventWriterFactory&& factory, StreamDataChannelExecutor& ex, uint64_t client_id,
+            uint32_t sid);
   template <typename T>
   asio::awaitable<bool> WriteEvent(std::unique_ptr<T>&& event) {
     std::unique_ptr<MuxEvent> write_ev = std::move(event);
@@ -79,8 +80,9 @@ class MuxStream : public Stream {
   EventWriterFactory event_writer_factory_;
   EventWriter event_writer_;
   StreamDataChannel data_channel_;
+  uint64_t client_id_;
   uint32_t sid_;
-  bool is_remote_closed_;
+  bool closed_;
 };
 
 }  // namespace snova

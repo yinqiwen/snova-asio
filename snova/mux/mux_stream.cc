@@ -63,7 +63,7 @@ uint32_t MuxStream::NextID(bool is_client) {
 }
 MuxStreamPtr MuxStream::New(EventWriterFactory&& factory, StreamDataChannelExecutor& ex,
                             uint64_t client_id, uint32_t sid) {
-  MuxStreamPtr p(new MuxStream(std::move(factory), ex, sid));
+  MuxStreamPtr p(new MuxStream(std::move(factory), ex, client_id, sid));
   ClientStreamID id{client_id, sid};
   g_streams.emplace(id, p);
   return p;
@@ -79,14 +79,15 @@ MuxStreamPtr MuxStream::Get(uint64_t client_id, uint32_t sid) {
 void MuxStream::Remove(uint64_t client_id, uint32_t sid) {
   ClientStreamID id{client_id, sid};
   g_streams.erase(id);
-  // SNOVA_INFO("[{}]Remove stream.", sid);
 }
 
-MuxStream::MuxStream(EventWriterFactory&& factory, StreamDataChannelExecutor& ex, uint32_t sid)
+MuxStream::MuxStream(EventWriterFactory&& factory, StreamDataChannelExecutor& ex,
+                     uint64_t client_id, uint32_t sid)
     : event_writer_factory_(std::move(factory)),
       data_channel_(ex, 1),
+      client_id_(client_id),
       sid_(sid),
-      is_remote_closed_(false) {
+      closed_(false) {
   event_writer_ = event_writer_factory_();
   g_active_stream_size++;
 }
@@ -107,6 +108,9 @@ asio::awaitable<std::error_code> MuxStream::Open(const std::string& host, uint16
 }
 
 asio::awaitable<std::error_code> MuxStream::Offer(IOBufPtr&& buf, size_t len) {
+  if (closed_) {
+    co_return std::make_error_code(std::errc::no_link);
+  }
   auto [ec] =
       co_await data_channel_.async_send(std::error_code{}, std::move(buf), len,
                                         ::asio::experimental::as_tuple(::asio::use_awaitable));
@@ -117,6 +121,9 @@ asio::awaitable<std::error_code> MuxStream::Offer(IOBufPtr&& buf, size_t len) {
   co_return std::error_code{};
 }
 asio::awaitable<StreamReadResult> MuxStream::Read() {
+  if (closed_) {
+    co_return StreamReadResult{nullptr, 0, std::make_error_code(std::errc::no_link)};
+  }
   auto [ec, data, len] =
       co_await data_channel_.async_receive(::asio::experimental::as_tuple(::asio::use_awaitable));
   if (ec) {
@@ -137,12 +144,13 @@ asio::awaitable<std::error_code> MuxStream::Write(IOBufPtr&& buf, size_t len) {
   co_return std::error_code{};
 }
 asio::awaitable<std::error_code> MuxStream::Close(bool close_by_remote) {
-  if (is_remote_closed_) {
+  if (closed_) {
     co_return std::error_code{};
   }
+  MuxStream::Remove(client_id_, sid_);
   SNOVA_INFO("[{}]Close from remote peer:{}", sid_, close_by_remote);
+  closed_ = true;
   data_channel_.close();
-  is_remote_closed_ = true;
   if (close_by_remote) {
     // do nothing
   } else {

@@ -59,10 +59,10 @@ cc_library(
 cc_library(
     name = "async_mutex",
     srcs = [
-        "async_mutex.cc",
+        "async_channel_mutex.cc",
     ],
     hdrs = [
-        "async_mutex.h",
+        "async_channel_mutex.h",
     ],
     copts = SNOVA_DEFAULT_COPTS,
     deps = [

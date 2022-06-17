@@ -26,7 +26,7 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "snova/util/async_mutex.h"
+#include "snova/util/async_channel_mutex.h"
 #include "asio/experimental/as_tuple.hpp"
 
 namespace snova {
