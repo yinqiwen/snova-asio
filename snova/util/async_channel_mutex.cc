@@ -26,14 +26,20 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "snova/util/async_mutex.h"
+#include "snova/util/async_channel_mutex.h"
 #include "asio/experimental/as_tuple.hpp"
 
 namespace snova {
 AsyncChannelMutex::AsyncChannelMutex(const AsyncChannelMutexExecutor& ex)
     : channel_(ex, 1), wait_count_(0), locked_(false) {}
-void AsyncChannelMutex::Close() { channel_.close(); }
+void AsyncChannelMutex::Close() {
+  channel_.cancel();
+  channel_.close();
+}
 asio::awaitable<std::error_code> AsyncChannelMutex::Lock() {
+  if (!channel_.is_open()) {
+    co_return std::error_code{};
+  }
   while (locked_) {
     wait_count_++;
     auto [ec, v] =
@@ -47,6 +53,9 @@ asio::awaitable<std::error_code> AsyncChannelMutex::Lock() {
   co_return std::error_code{};
 }
 asio::awaitable<std::error_code> AsyncChannelMutex::Unlock() {
+  if (!channel_.is_open()) {
+    co_return std::error_code{};
+  }
   locked_ = false;
   if (wait_count_ > 0) {
     auto [ec] = co_await channel_.async_send(std::error_code{}, true,

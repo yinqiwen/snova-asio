@@ -43,7 +43,8 @@
 #include "snova/log/log_macros.h"
 #include "snova/mux/cipher_context.h"
 #include "snova/mux/mux_stream.h"
-#include "snova/util/async_mutex.h"
+#include "snova/util/async_channel_mutex.h"
+// #include "snova/util/async_mutex.h"
 
 namespace snova {
 using ServerAuthResult = std::tuple<std::string, uint64_t, bool>;
@@ -69,11 +70,18 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
   uint32_t GetIdx() const { return idx_; }
   uint32_t GetExpireAtUnixSecs() const { return expire_at_unix_secs_; }
   uint64_t GetClientId() const { return client_id_; }
-  uint32_t GetLastActiveUnixSecs() const { return last_active_unix_secs_; }
+  uint32_t GetLastActiveUnixSecs() const {
+    return last_active_write_unix_secs_ > last_active_read_unix_secs_ ? last_active_write_unix_secs_
+                                                                      : last_active_read_unix_secs_;
+  }
   uint64_t GetRecvBytes() const { return recv_bytes_; }
   uint64_t GetSendBytes() const { return send_bytes_; }
   bool IsRetired() const { return retired_; }
   void SetRetired() { retired_ = true; }
+  uint64_t GetLatestWindowRecvBytes() const;
+  uint64_t GetLatestWindowSendBytes() const;
+  std::string GetReadState() const;
+  void ResetCounter(uint32_t now);
 
   int ComparePriority(const MuxConnection& other) const;
 
@@ -102,6 +110,7 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
   ::asio::ip::tcp::socket socket_;
   std::unique_ptr<CipherContext> cipher_ctx_;
   AsyncChannelMutex write_mutex_;
+  // cppcoro::async_mutex write_mutex_;
 
   std::vector<uint8_t> write_buffer_;
   std::vector<uint8_t> read_buffer_;
@@ -111,9 +120,13 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
   uint32_t idx_;
   uint32_t expire_at_unix_secs_;
   uint32_t last_unmatch_stream_id_;
-  uint32_t last_active_unix_secs_;
+  uint32_t last_active_write_unix_secs_;
+  uint32_t last_active_read_unix_secs_;
   uint64_t recv_bytes_;
   uint64_t send_bytes_;
+  uint32_t read_state_;
+  std::vector<uint32_t> latest_window_recv_bytes_;
+  std::vector<uint32_t> latest_window_send_bytes_;
   RelayHandler server_relay_;
   RetireCallback retire_callback_;
   bool is_local_;

@@ -45,8 +45,6 @@ class MuxClient {
   asio::awaitable<std::error_code> Init(const std::string& user, const std::string& cipher_method,
                                         const std::string& cipher_key);
 
-  void ReportStatInfo(StatValues& stats);
-
  private:
   asio::awaitable<std::error_code> NewConnection(uint32_t idx);
   asio::awaitable<void> CheckConnections();
@@ -60,6 +58,5 @@ class MuxClient {
   // uint32_t select_cursor_ = 0;
   uint64_t client_id_ = 0;
 };
-void register_mux_stat();
 
 }  // namespace snova

@@ -66,6 +66,49 @@ std::shared_ptr<MuxConnManager>& MuxConnManager::GetInstance() {
   static std::shared_ptr<MuxConnManager> g_instance = std::make_shared<MuxConnManager>();
   return g_instance;
 }
+
+void MuxConnManager::RegisterStat() {
+  register_stat_func([]() -> StatValues {
+    StatValues vals;
+    auto& kv = vals["Mux"];
+    kv["stream_num"] = std::to_string(MuxStream::Size());
+    kv["stream_active_num"] = std::to_string(MuxStream::ActiveSize());
+    kv["connection_num"] = std::to_string(MuxConnection::Size());
+    kv["connection_active_num"] = std::to_string(MuxConnection::ActiveSize());
+    return vals;
+  });
+  register_stat_func([]() -> StatValues {
+    StatValues vals;
+    MuxConnManager::GetInstance()->ReportStatInfo(vals);
+    return vals;
+  });
+}
+
+void MuxConnManager::ReportStatInfo(StatValues& stats) {
+  uint32_t now = time(nullptr);
+  for (const auto& [user, user_conn] : mux_conns_) {
+    for (const auto& [client_id, session] : user_conn->sessions) {
+      auto& kv = stats[fmt::format("MuxConnection:{}:{}", user, client_id)];
+      for (size_t i = 0; i < session->conns.size(); i++) {
+        auto& conn = session->conns[i];
+        if (!conn) {
+          kv[fmt::format("[{}]", i)] = "NULL";
+        } else {
+          kv[fmt::format("[{}]read_state", i)] = conn->GetReadState();
+          kv[fmt::format("[{}]inactive_secs", i)] =
+              std::to_string(now - conn->GetLastActiveUnixSecs());
+          kv[fmt::format("[{}]recv_bytes", i)] = std::to_string(conn->GetRecvBytes());
+          kv[fmt::format("[{}]send_bytes", i)] = std::to_string(conn->GetSendBytes());
+          kv[fmt::format("[{}]latest_30s_recv_bytes", i)] =
+              std::to_string(conn->GetLatestWindowRecvBytes());
+          kv[fmt::format("[{}]latest_30s_send_bytes", i)] =
+              std::to_string(conn->GetLatestWindowSendBytes());
+        }
+      }
+    }
+  }
+}
+
 EventWriterFactory MuxConnManager::GetEventWriterFactory(std::string_view user,
                                                          uint64_t client_id) {
   auto user_found = mux_conns_.find(user);

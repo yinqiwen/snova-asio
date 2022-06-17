@@ -36,6 +36,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "asio.hpp"
 #include "snova/mux/mux_connection.h"
+#include "snova/util/stat.h"
 namespace snova {
 struct MuxSession : public std::enable_shared_from_this<MuxSession> {
   using MuxConnArray = std::vector<MuxConnectionPtr>;
@@ -55,6 +56,8 @@ class MuxConnManager {
  public:
   static std::shared_ptr<MuxConnManager>& GetInstance();
 
+  void RegisterStat();
+
   MuxSessionPtr GetSession(std::string_view user, uint64_t client_id);
   uint32_t Add(std::string_view user, uint64_t client_id, MuxConnectionPtr conn);
   void Remove(std::string_view user, uint64_t client_id, MuxConnectionPtr conn);
@@ -63,8 +66,10 @@ class MuxConnManager {
   EventWriterFactory GetEventWriterFactory(std::string_view user, uint64_t client_id);
 
  private:
+  void ReportStatInfo(StatValues& stats);
   UserMuxConnPtr GetUserMuxConn(std::string_view user);
   using UserMuxConnTable = absl::flat_hash_map<std::string_view, UserMuxConnPtr>;
   UserMuxConnTable mux_conns_;
 };
+
 }  // namespace snova

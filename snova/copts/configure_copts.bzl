@@ -23,8 +23,8 @@ SNOVA_DEFAULT_COPTS = select({
         # "-fcoroutines",
         # "-DASIO_HAS_IO_URING",
         # "-DASIO_DISABLE_EPOLL",
-        "-O0",
-        "-g",
+        "-O3",
+        # "-g",
     ],
 })
 
