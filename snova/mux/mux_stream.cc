@@ -150,6 +150,7 @@ asio::awaitable<std::error_code> MuxStream::Close(bool close_by_remote) {
   MuxStream::Remove(client_id_, sid_);
   SNOVA_INFO("[{}]Close from remote peer:{}", sid_, close_by_remote);
   closed_ = true;
+  data_channel_.cancel();
   data_channel_.close();
   if (close_by_remote) {
     // do nothing
