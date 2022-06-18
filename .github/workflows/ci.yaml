@@ -18,7 +18,7 @@ jobs:
       - name: Get the tag version
         id: get_version
         if: startsWith(github.ref, 'refs/tags/')
-        run: echo BUILD_VERSION=$(echo "${GITHUB_REF}"" | cut -d / -f 3) >> "$GITHUB_ENV"
+        run: echo BUILD_VERSION="$(echo "${GITHUB_REF}" | cut -d / -f 3)" >> "$GITHUB_ENV"
       - name: Get the commit version
         if: startsWith(github.ref, 'refs/tags/') != true
         run: echo BUILD_VERSION="${GITHUB_SHA}" >> "$GITHUB_ENV"
@@ -82,7 +82,7 @@ jobs:
       - name: Get the tag version
         id: get_version
         if: startsWith(github.ref, 'refs/tags/')
-        run: echo BUILD_VERSION=$(echo "${GITHUB_REF}" | cut -d / -f 3) >> "$GITHUB_ENV"
+        run: echo BUILD_VERSION="$(echo "${GITHUB_REF}" | cut -d / -f 3)" >> "$GITHUB_ENV"
       - name: Get the commit version
         if: startsWith(github.ref, 'refs/tags/') != true
         run: echo BUILD_VERSION="${GITHUB_SHA}" >> "$GITHUB_ENV"
