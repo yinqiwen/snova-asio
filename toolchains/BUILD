@@ -163,7 +163,7 @@ toolchain(
     ],
     toolchain = select({
         "//:local_musl": "@local_arm_linux_musleabihf//:cc_toolchain",
-        "//conditions:default": "@local_arm_linux_musleabihf//:cc_toolchain",
+        "//conditions:default": "@arm_linux_musleabihf//:cc_toolchain",
     }),
     toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
 )
