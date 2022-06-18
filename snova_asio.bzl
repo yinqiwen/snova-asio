@@ -144,9 +144,38 @@ cc_library(
     )
 
     native.new_local_repository(
+        name = "local_arm_linux_musleabi",
+        path = "/opt/musl_gcc_compiles/arm-linux-musleabi-cross",
+        build_file = clean_dep("//:toolchains/arm_linux_musleabi.BUILD"),
+    )
+    native.new_local_repository(
+        name = "local_arm_linux_musleabihf",
+        path = "/opt/musl_gcc_compiles/arm-linux-musleabihf-cross",
+        build_file = clean_dep("//:toolchains/arm_linux_musleabihf.BUILD"),
+    )
+
+    native.new_local_repository(
         name = "local_x64_linux_musl_gcc",
         path = "/opt/musl_gcc_compiles/x86_64-linux-musl-native",
         build_file = clean_dep("//:toolchains/x86_64-linux-musl.BUILD"),
+    )
+
+    http_archive(
+        name = "arm_linux_musleabi",
+        strip_prefix = "arm-linux-musleabi-cross",
+        build_file = clean_dep("//:toolchains/arm_linux_musleabi.BUILD"),
+        urls = [
+            "https://more.musl.cc/11/x86_64-linux-musl/arm-linux-musleabi-cross.tgz",
+        ],
+    )
+
+    http_archive(
+        name = "arm_linux_musleabihf",
+        strip_prefix = "arm-linux-musleabihf-cross",
+        build_file = clean_dep("//:toolchains/arm_linux_musleabihf.BUILD"),
+        urls = [
+            "https://more.musl.cc/11/x86_64-linux-musl/arm-linux-musleabihf-cross.tgz",
+        ],
     )
 
     http_archive(

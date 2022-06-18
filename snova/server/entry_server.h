@@ -28,6 +28,7 @@
  */
 
 #pragma once
+#include <memory>
 #include <string>
 #include <system_error>
 #include <vector>
@@ -40,7 +41,7 @@ asio::awaitable<std::error_code> start_entry_server(const std::string& addr);
 
 asio::awaitable<void> handle_socks5_connection(::asio::ip::tcp::socket&& sock,
                                                IOBufPtr&& read_buffer, Bytes& readable_data);
-asio::awaitable<void> handle_tls_connection(::asio::ip::tcp::socket&& sock, IOBufPtr&& read_buffer,
+asio::awaitable<bool> handle_tls_connection(::asio::ip::tcp::socket&& sock, IOBufPtr&& read_buffer,
                                             Bytes& readable_data);
 asio::awaitable<void> handle_http_connection(::asio::ip::tcp::socket&& sock, IOBufPtr&& read_buffer,
                                              Bytes& readable_data);

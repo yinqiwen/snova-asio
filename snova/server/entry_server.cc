@@ -85,22 +85,27 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
       SNOVA_ERROR("sslv2/sslv1 not supported!");
       co_return;
     }
-    co_await handle_tls_connection(std::move(sock), std::move(buffer), readable);
+    bool success = co_await handle_tls_connection(std::move(sock), std::move(buffer), readable);
+    if (success) {
+      co_return;
+    }
   } else if (absl::EqualsIgnoreCase(cmd3, "GET") || absl::EqualsIgnoreCase(cmd3, "CON") ||
              absl::EqualsIgnoreCase(cmd3, "PUT") || absl::EqualsIgnoreCase(cmd3, "POS") ||
              absl::EqualsIgnoreCase(cmd3, "DEL") || absl::EqualsIgnoreCase(cmd3, "OPT") ||
              absl::EqualsIgnoreCase(cmd3, "TRA") || absl::EqualsIgnoreCase(cmd3, "PAT") ||
              absl::EqualsIgnoreCase(cmd3, "HEA") || absl::EqualsIgnoreCase(cmd3, "UPG")) {
     co_await handle_http_connection(std::move(sock), std::move(buffer), readable);
-  } else {  // other
-    if (remote_endpoint) {
-      // just relay to remote
-      SNOVA_INFO("Redirect proxy connection to {}.", *remote_endpoint);
-      co_await relay(std::move(sock), readable, remote_endpoint->address().to_string(),
-                     remote_endpoint->port(), true);
-    } else {
-      // no remote host&port to relay
-    }
+    co_return;
+  }
+
+  // other
+  if (remote_endpoint) {
+    // just relay to direct
+    SNOVA_INFO("Redirect proxy connection to {}.", *remote_endpoint);
+    co_await relay_direct(std::move(sock), readable, remote_endpoint->address().to_string(),
+                          remote_endpoint->port(), true);
+  } else {
+    // no remote host&port to relay
   }
   co_return;
 }
