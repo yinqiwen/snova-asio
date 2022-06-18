@@ -1,5 +1,5 @@
 name: CIBuild
-
+# jscpd:ignore-start
 on:
   push:
     # Sequence of patterns matched against refs/heads
@@ -96,4 +96,5 @@ jobs:
         with:
           files: snova_asio_**.tar.gz
           fail_on_unmatched_files: true
+# jscpd:ignore-end
   
