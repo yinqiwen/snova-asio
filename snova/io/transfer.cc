@@ -27,11 +27,12 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/io/transfer.h"
+#include <utility>
 #include <vector>
 #include "asio/experimental/as_tuple.hpp"
 
 namespace snova {
-using namespace asio::experimental::awaitable_operators;
+using namespace asio::experimental::awaitable_operators;  // NOLINT
 
 asio::awaitable<void> transfer(StreamPtr from, StreamPtr to, const TransferRoutineFunc& routine) {
   while (true) {

@@ -42,7 +42,7 @@ static constexpr uint8_t kAddrIPV4 = 1;
 static constexpr uint8_t kAddrIPV6 = 4;
 static constexpr uint8_t kAddrDomain = 3;
 asio::awaitable<void> handle_socks5_connection(::asio::ip::tcp::socket&& s, IOBufPtr&& rbuf,
-                                               Bytes& readable_data) {
+                                               const Bytes& readable_data) {
   // SNOVA_INFO("Handle proxy connection by socks5.");
   ::asio::ip::tcp::socket sock(std::move(s));  //  make rvalue sock not release after co_await
   IOBufPtr conn_read_buffer = std::move(rbuf);

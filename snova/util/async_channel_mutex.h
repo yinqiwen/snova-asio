@@ -35,7 +35,7 @@ using AsyncChannelMutexExecutor =
     typename asio::experimental::channel<void(std::error_code, bool)>::executor_type;
 class AsyncChannelMutex {
  public:
-  AsyncChannelMutex(const AsyncChannelMutexExecutor& ex);
+  explicit AsyncChannelMutex(const AsyncChannelMutexExecutor& ex);
   asio::awaitable<std::error_code> Lock();
   asio::awaitable<std::error_code> Unlock();
   void Close();

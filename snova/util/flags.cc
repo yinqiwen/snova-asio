@@ -27,19 +27,30 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/util/flags.h"
+#include <memory>
 
 namespace snova {
 bool g_is_middle_node = false;
 bool g_is_entry_node = false;
 bool g_is_exit_node = false;
 bool g_is_redirect_node = false;
-std::string g_remote_server;
-std::string g_http_proxy_host;
+// std::string g_remote_server;
+// std::string g_http_proxy_host;
 uint16_t g_http_proxy_port = 0;
 uint32_t g_conn_num_per_server = 5;
 uint32_t g_iobuf_max_pool_size = 64;
 uint32_t g_stream_io_timeout_secs = 120;
 uint32_t g_connection_expire_secs = 1800;
 uint32_t g_tcp_write_timeout_secs = 10;
+
+std::shared_ptr<GlobalFlags>& GlobalFlags::GetIntance() {
+  static std::shared_ptr<GlobalFlags> s = std::make_shared<GlobalFlags>();
+  return s;
+}
+
+void GlobalFlags::SetHttpProxyHost(const std::string& s) { http_proxy_host_ = s; }
+const std::string& GlobalFlags::GetHttpProxyHost() { return http_proxy_host_; }
+void GlobalFlags::SetRemoteServer(const std::string& s) { remote_server_ = s; }
+const std::string& GlobalFlags::GetRemoteServer() { return remote_server_; }
 
 }  // namespace snova

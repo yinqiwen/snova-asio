@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
 #include <string_view>
 #include "asio.hpp"
 #include "snova/io/io.h"

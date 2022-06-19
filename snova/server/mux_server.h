@@ -28,7 +28,10 @@
  */
 
 #pragma once
+#include <string>
+
 #include "asio.hpp"
+
 namespace snova {
 asio::awaitable<std::error_code> start_mux_server(const std::string& addr,
                                                   const std::string& cipher_method,

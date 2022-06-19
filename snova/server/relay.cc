@@ -29,6 +29,7 @@
 #include "snova/server/relay.h"
 
 #include <type_traits>
+#include <utility>
 
 #include "absl/cleanup/cleanup.h"
 #include "asio/experimental/as_tuple.hpp"
@@ -39,7 +40,7 @@
 #include "snova/util/net_helper.h"
 #include "snova/util/time_wheel.h"
 
-using namespace asio::experimental::awaitable_operators;
+using namespace asio::experimental::awaitable_operators;  // NOLINT
 namespace snova {
 
 using CloseFunc = std::function<asio::awaitable<std::error_code>()>;
@@ -78,7 +79,6 @@ static asio::awaitable<void> do_relay(T& local_stream, const Bytes& readed_data,
   }
 
   bool direct_relay = (g_is_exit_node || direct);
-  // TODO
   if (direct_relay) {
     auto remote_socket = co_await get_connected_socket(remote_host, remote_port, is_tcp);
     if (remote_socket) {

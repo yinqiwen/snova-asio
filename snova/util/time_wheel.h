@@ -45,14 +45,14 @@ using TimerTaskPtr = std::shared_ptr<TimerTask>;
 class TimeWheel {
  public:
   static std::shared_ptr<TimeWheel>& GetInstance();
-  TimeWheel(uint32_t max_timeout_secs = 600);
+  explicit TimeWheel(uint32_t max_timeout_secs = 600);
   CancelFunc Add(TimeoutFunc&& func, GetActiveTimeFunc&& active, uint32_t timeout_secs);
   CancelFunc Add(TimeoutFunc&& func, uint32_t timeout_secs);
 
   asio::awaitable<void> Run();
 
  private:
-  CancelFunc DoRegister(TimerTaskPtr& task);
+  CancelFunc DoRegister(const TimerTaskPtr& task);
   using TimerTaskQueue = std::vector<TimerTaskPtr>;
   using TimeWheelQueue = std::vector<TimerTaskQueue>;
   TimeWheelQueue time_wheel_;

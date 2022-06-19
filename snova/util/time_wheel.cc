@@ -67,7 +67,8 @@ CancelFunc TimeWheel::Add(TimeoutFunc&& func, uint32_t timeout_secs) {
   return DoRegister(task);
 }
 
-CancelFunc TimeWheel::DoRegister(TimerTaskPtr& task) {
+CancelFunc TimeWheel::DoRegister(const TimerTaskPtr& rtask) {
+  TimerTaskPtr task = rtask;
   if (task->timeout_secs == 0) {
     task->timeout_secs = max_timeout_secs_ / 2;
   }

@@ -57,7 +57,7 @@ asio::awaitable<void> handle_http_connection(::asio::ip::tcp::socket&& s, IOBufP
   absl::string_view http_headers_view((const char*)(readable_data.data()), end_pos);
   http_headers_view = absl::StripAsciiWhitespace(http_headers_view);
   absl::string_view host_port_view;
-  int rc = parse_http_hostport(http_headers_view, host_port_view);
+  int rc = parse_http_hostport(http_headers_view, &host_port_view);
   if (rc != 0) {
     SNOVA_ERROR("Failed to find Host from request:{}", http_headers_view);
     co_return;

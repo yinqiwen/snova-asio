@@ -30,6 +30,7 @@
 #pragma once
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 #include "asio.hpp"
 #include "snova/io/io.h"
@@ -50,7 +51,7 @@ class MuxStream : public Stream {
   ~MuxStream();
 
   static uint32_t NextID(bool is_client);
-  static MuxStreamPtr New(EventWriterFactory&& factory, StreamDataChannelExecutor& ex,
+  static MuxStreamPtr New(EventWriterFactory&& factory, const StreamDataChannelExecutor& ex,
                           uint64_t client_id, uint32_t sid);
   static MuxStreamPtr Get(uint64_t client_id, uint32_t sid);
   static void Remove(uint64_t client_id, uint32_t sid);
@@ -58,7 +59,7 @@ class MuxStream : public Stream {
   static size_t ActiveSize();
 
  private:
-  MuxStream(EventWriterFactory&& factory, StreamDataChannelExecutor& ex, uint64_t client_id,
+  MuxStream(EventWriterFactory&& factory, const StreamDataChannelExecutor& ex, uint64_t client_id,
             uint32_t sid);
   template <typename T>
   asio::awaitable<bool> WriteEvent(std::unique_ptr<T>&& event) {

@@ -29,6 +29,7 @@
 #include "snova/server/entry_server.h"
 #include <string_view>
 #include <system_error>
+#include <utility>
 
 #include "absl/cleanup/cleanup.h"
 #include "absl/flags/declare.h"
@@ -52,7 +53,7 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
   std::unique_ptr<::asio::ip::tcp::endpoint> remote_endpoint;
   if (g_is_entry_node && g_is_redirect_node) {
     remote_endpoint = std::make_unique<::asio::ip::tcp::endpoint>();
-    if (0 != get_orig_dst(sock.native_handle(), *remote_endpoint)) {
+    if (0 != get_orig_dst(sock.native_handle(), remote_endpoint.get())) {
       remote_endpoint.release();
     } else {
       if (is_private_address(remote_endpoint->address())) {

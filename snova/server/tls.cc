@@ -33,13 +33,13 @@
 
 namespace snova {
 asio::awaitable<bool> handle_tls_connection(::asio::ip::tcp::socket&& s, IOBufPtr&& rbuf,
-                                            Bytes& readable_data) {
+                                            const Bytes& readable_data) {
   SNOVA_INFO("Handle proxy connection by tls.");
   ::asio::ip::tcp::socket sock(std::move(s));  //  make rvalue sock not release after co_await
   IOBufPtr conn_read_buffer = std::move(rbuf);
   IOBuf& read_buffer = *conn_read_buffer;
   std::string remote_host;
-  int rc = parse_sni(readable_data.data(), readable_data.size(), remote_host);
+  int rc = parse_sni(readable_data.data(), readable_data.size(), &remote_host);
   if (0 != rc) {
     SNOVA_ERROR("Failed to read sni with rc:{}", rc);
     co_return false;
