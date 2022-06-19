@@ -69,6 +69,9 @@ static IOBuf* get_raw_iobuf(size_t n) {
     g_io_bufs.pop();
     g_iobuf_pool_bytes -= p->capacity();
   }
+  if (n < (kMaxChunkSize + kReservedBufferSize)) {
+    n = kMaxChunkSize + kReservedBufferSize;
+  }
   if (p->size() < n) {
     p->resize(n);
   }

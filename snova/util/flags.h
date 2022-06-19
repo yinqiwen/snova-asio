@@ -36,6 +36,7 @@ extern bool g_is_middle_node;
 extern bool g_is_entry_node;
 extern bool g_is_exit_node;
 extern bool g_is_redirect_node;
+
 // extern std::string g_remote_server;
 // extern std::string g_http_proxy_host;
 extern uint16_t g_http_proxy_port;
