@@ -27,7 +27,7 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/mux/mux_conn_manager.h"
-#include <atomic>
+#include <utility>
 namespace snova {
 
 EventWriterFactory MuxSession::GetEventWriterFactory() {
@@ -94,7 +94,7 @@ void MuxConnManager::ReportStatInfo(StatValues& stats) {
         if (!conn) {
           kv[fmt::format("[{}]", i)] = "NULL";
         } else {
-          kv[fmt::format("[{}]read_state", i)] = conn->GetReadState();
+          // kv[fmt::format("[{}]read_state", i)] = conn->GetReadState();
           kv[fmt::format("[{}]inactive_secs", i)] =
               std::to_string(now - conn->GetLastActiveUnixSecs());
           kv[fmt::format("[{}]recv_bytes", i)] = std::to_string(conn->GetRecvBytes());

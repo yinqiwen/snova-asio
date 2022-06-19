@@ -83,7 +83,8 @@ int main(int argc, char** argv) {
   app.add_option("--user", auth_user, "Auth user name");
   std::string proxy_server;
   app.add_option("--proxy", proxy_server, "The proxy server to connect mux server.");
-  app.add_option("--remote", snova::g_remote_server, "Remote server address");
+  std::string remote_server;
+  app.add_option("--remote", remote_server, "Remote server address");
   app.add_option("--conn_num_per_server", snova::g_conn_num_per_server,
                  "Remote server connection number per server.");
   app.add_option("--conn_expire_secs", snova::g_connection_expire_secs,
@@ -128,7 +129,7 @@ int main(int argc, char** argv) {
       error_exit("Invalid '--proxy' args.");
       return -1;
     }
-    snova::g_http_proxy_host = std::string(host_ports[0]);
+    snova::GlobalFlags::GetIntance()->SetHttpProxyHost(std::string(host_ports[0]));
   }
 
   if (!snova::g_is_entry_node && !snova::g_is_middle_node && !snova::g_is_exit_node) {
@@ -142,11 +143,12 @@ int main(int argc, char** argv) {
   }
 
   if (snova::g_is_entry_node || snova::g_is_middle_node) {
-    if (snova::g_remote_server.empty()) {
+    if (remote_server.empty()) {
       error_exit("'remote' is empty for entry/middle node.");
       return -1;
     }
   }
+  snova::GlobalFlags::GetIntance()->SetRemoteServer(remote_server);
   SNOVA_INFO("Snova start to run as {} node.",
              (snova::g_is_entry_node ? "ENTRY" : (snova::g_is_exit_node ? "EXIT" : "MIDDLE")));
   ::asio::io_context ctx;

@@ -30,6 +30,7 @@ target_system_name = {
     "k8": "x86_64-linux-gnu",
     "armv7l": "armv7l-linux-musleabihf",
     "armv5l": "armv5l-linux-musleabi",
+    "arm": "arm-linux-musleabi",
 }
 
 def _toolchain_config_impl(ctx):
@@ -110,7 +111,7 @@ cc_toolchain_config = rule(
     attrs = {
         "tool_paths": attr.label(mandatory = True, allow_files = True),
         "cxx_builtin_include_directories": attr.string_list(),
-        "cpu": attr.string(mandatory = True, values = ["armv7l", "armv5l", "k8"]),
+        "cpu": attr.string(mandatory = True, values = ["armv7l", "armv5l", "arm", "k8"]),
     },
     provides = [CcToolchainConfigInfo],
 )

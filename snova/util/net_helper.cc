@@ -33,6 +33,7 @@
 #endif
 #include <array>
 #include <memory>
+#include <vector>
 
 #include "absl/strings/str_split.h"
 #include "asio/experimental/as_tuple.hpp"
@@ -61,23 +62,45 @@ PaserEndpointResult parse_endpoint(const std::string& addr) {
   return PaserEndpointResult{std::move(endpoint), std::error_code{}};
 }
 
+static std::array<::asio::ip::address_v4_range, 3> g_private_networks = {
+    ::asio::ip::make_network_v4("10.0.0.0/8").hosts(),
+    ::asio::ip::make_network_v4("172.16.0.0/12").hosts(),
+    ::asio::ip::make_network_v4("192.168.0.0/16").hosts(),
+};
+
+bool is_private_address(const ::asio::ip::address& addr) {
+  if (!addr.is_v4()) {
+    return false;
+  }
+  ::asio::ip::address_v4 v4_addr = addr.to_v4();
+  if (v4_addr.is_loopback()) {
+    return true;
+  }
+  for (size_t i = 0; i < sizeof(g_private_networks); i++) {
+    if (g_private_networks[i].find(addr.to_v4()) != g_private_networks[i].end()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 #define SO_ORIGINAL_DST 80
-int get_orig_dst(int fd, ::asio::ip::tcp::endpoint& endpoint) {
+int get_orig_dst(int fd, ::asio::ip::tcp::endpoint* endpoint) {
 #ifdef __linux__
   struct sockaddr_in6 serverAddrV6;
   struct sockaddr_in serverAddr;
-  int size = sizeof(serverAddr);
-  if (getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &serverAddr, (socklen_t*)&size) >= 0) {
-    endpoint = ::asio::ip::tcp::endpoint(
+  socklen_t size = sizeof(serverAddr);
+  if (getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &serverAddr, &size) >= 0) {
+    *endpoint = ::asio::ip::tcp::endpoint(
         ::asio::ip::make_address_v4(ntohl(serverAddr.sin_addr.s_addr)), ntohs(serverAddr.sin_port));
     return 0;
   }
   size = sizeof(serverAddrV6);
-  if (getsockopt(fd, SOL_IPV6, SO_ORIGINAL_DST, &serverAddrV6, (socklen_t*)&size) >= 0) {
+  if (getsockopt(fd, SOL_IPV6, SO_ORIGINAL_DST, &serverAddrV6, &size) >= 0) {
     std::array<uint8_t, 16> v6_ip;
     memcpy(v6_ip.data(), serverAddrV6.sin6_addr.s6_addr, 16);
-    endpoint = ::asio::ip::tcp::endpoint(::asio::ip::make_address_v6(v6_ip),
-                                         ntohs(serverAddrV6.sin6_port));
+    *endpoint = ::asio::ip::tcp::endpoint(::asio::ip::make_address_v6(v6_ip),
+                                          ntohs(serverAddrV6.sin6_port));
     return 0;
   }
 #endif
@@ -107,8 +130,8 @@ asio::awaitable<SocketPtr> get_connected_socket(const std::string& host, uint16_
 }
 
 asio::awaitable<std::error_code> connect_remote_via_http_proxy(
-    ::asio::ip::tcp::socket& socket, const ::asio::ip::tcp::endpoint& remote,
-    const std::string& proxy_host, uint32_t proxy_port) {
+    SocketRef socket, const ::asio::ip::tcp::endpoint& remote, const std::string& proxy_host,
+    uint32_t proxy_port) {
   auto ex = co_await asio::this_coro::executor;
   asio::ip::tcp::resolver r(ex);
   std::string port_str = std::to_string(proxy_port);

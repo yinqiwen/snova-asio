@@ -43,9 +43,9 @@ namespace snova {
 #define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
 #endif
 
-static int parse_tls_header(const uint8_t *, size_t, std::string &);
-static int parse_extensions(const uint8_t *, size_t, std::string &);
-static int parse_server_name_extension(const uint8_t *, size_t, std::string &);
+static int parse_tls_header(const uint8_t *, size_t, std::string *);
+static int parse_extensions(const uint8_t *, size_t, std::string *);
+static int parse_server_name_extension(const uint8_t *, size_t, std::string *);
 
 static const char tls_alert[] = {
     0x15,       /* TLS Alert */
@@ -67,7 +67,7 @@ static const char tls_alert[] = {
  *  -4   - malloc failure
  *  < -4 - Invalid TLS client hello
  */
-static int parse_tls_header(const uint8_t *data, size_t data_len, std::string &hostname) {
+static int parse_tls_header(const uint8_t *data, size_t data_len, std::string *hostname) {
   uint8_t tls_content_type;
   uint8_t tls_version_major;
   uint8_t tls_version_minor;
@@ -105,7 +105,7 @@ static int parse_tls_header(const uint8_t *data, size_t data_len, std::string &h
   }
 
   /* TLS record length */
-  len = ((size_t)data[3] << 8) + (size_t)data[4] + TLS_HEADER_LEN;
+  len = (static_cast<size_t>(data[3]) << 8) + static_cast<size_t>(data[4]) + TLS_HEADER_LEN;
   data_len = MIN(data_len, len);
 
   /* Check we received entire TLS record length */
@@ -134,17 +134,17 @@ static int parse_tls_header(const uint8_t *data, size_t data_len, std::string &h
 
   /* Session ID */
   if (pos + 1 > data_len) return -5;
-  len = (size_t)data[pos];
+  len = static_cast<size_t>(data[pos]);
   pos += 1 + len;
 
   /* Cipher Suites */
   if (pos + 2 > data_len) return -5;
-  len = ((size_t)data[pos] << 8) + (size_t)data[pos + 1];
+  len = (static_cast<size_t>(data[pos]) << 8) + static_cast<size_t>(data[pos + 1]);
   pos += 2 + len;
 
   /* Compression Methods */
   if (pos + 1 > data_len) return -5;
-  len = (size_t)data[pos];
+  len = static_cast<size_t>(data[pos]);
   pos += 1 + len;
 
   if (pos == data_len && tls_version_major == 3 && tls_version_minor == 0) {
@@ -154,21 +154,21 @@ static int parse_tls_header(const uint8_t *data, size_t data_len, std::string &h
 
   /* Extensions */
   if (pos + 2 > data_len) return -5;
-  len = ((size_t)data[pos] << 8) + (size_t)data[pos + 1];
+  len = (static_cast<size_t>(data[pos] << 8)) + static_cast<size_t>(data[pos + 1]);
   pos += 2;
 
   if (pos + len > data_len) return -5;
   return parse_extensions(data + pos, len, hostname);
 }
 
-static int parse_extensions(const uint8_t *data, size_t data_len, std::string &hostname) {
+static int parse_extensions(const uint8_t *data, size_t data_len, std::string *hostname) {
   size_t pos = 0;
   size_t len;
 
   /* Parse each 4 bytes for the extension header */
   while (pos + 4 <= data_len) {
     /* Extension Length */
-    len = ((size_t)data[pos + 2] << 8) + (size_t)data[pos + 3];
+    len = (static_cast<size_t>(data[pos + 2]) << 8) + static_cast<size_t>(data[pos + 3]);
 
     /* Check if it's a server name extension */
     if (data[pos] == 0x00 && data[pos + 1] == 0x00) {
@@ -186,12 +186,12 @@ static int parse_extensions(const uint8_t *data, size_t data_len, std::string &h
 }
 
 static int parse_server_name_extension(const uint8_t *data, size_t data_len,
-                                       std::string &hostname) {
+                                       std::string *hostname) {
   size_t pos = 2; /* skip server name list length */
   size_t len;
 
   while (pos + 3 < data_len) {
-    len = ((size_t)data[pos + 1] << 8) + (size_t)data[pos + 2];
+    len = (static_cast<size_t>(data[pos + 1]) << 8) + static_cast<size_t>(data[pos + 2]);
 
     if (pos + 3 + len > data_len) return -5;
 
@@ -202,10 +202,10 @@ static int parse_server_name_extension(const uint8_t *data, size_t data_len,
         //   err("malloc() failure");
         //   return -4;
         // }
-        hostname.assign((const char *)(data + pos + 3), len);
+        hostname->assign((const char *)(data + pos + 3), len);
         // strncpy(*hostname, (const char *)(data + pos + 3), len);
 
-        //(*hostname)[len] = '\0';
+        // (*hostname)[len] = '\0';
 
         return 0;
       default: {
@@ -220,7 +220,7 @@ static int parse_server_name_extension(const uint8_t *data, size_t data_len,
   return -2;
 }
 
-int parse_sni(const uint8_t *data, size_t data_len, std::string &sni) {
+int parse_sni(const uint8_t *data, size_t data_len, std::string *sni) {
   return parse_tls_header(data, data_len, sni);
 }
 }  // namespace snova

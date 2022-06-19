@@ -28,6 +28,7 @@
  */
 
 #pragma once
+#include <memory>
 #include <optional>
 #include <string>
 namespace snova {
@@ -35,13 +36,26 @@ extern bool g_is_middle_node;
 extern bool g_is_entry_node;
 extern bool g_is_exit_node;
 extern bool g_is_redirect_node;
-extern std::string g_remote_server;
-extern std::string g_http_proxy_host;
+// extern std::string g_remote_server;
+// extern std::string g_http_proxy_host;
 extern uint16_t g_http_proxy_port;
 extern uint32_t g_conn_num_per_server;
 extern uint32_t g_connection_expire_secs;
 extern uint32_t g_iobuf_max_pool_size;
 extern uint32_t g_stream_io_timeout_secs;
 extern uint32_t g_tcp_write_timeout_secs;
+
+class GlobalFlags {
+ public:
+  static std::shared_ptr<GlobalFlags>& GetIntance();
+  void SetHttpProxyHost(const std::string& s);
+  const std::string& GetHttpProxyHost();
+  void SetRemoteServer(const std::string& s);
+  const std::string& GetRemoteServer();
+
+ private:
+  std::string http_proxy_host_;
+  std::string remote_server_;
+};
 
 }  // namespace snova

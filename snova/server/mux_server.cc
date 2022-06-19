@@ -27,8 +27,11 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/server/mux_server.h"
+#include <memory>
+#include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
 
 #include "absl/cleanup/cleanup.h"
 #include "absl/strings/str_split.h"

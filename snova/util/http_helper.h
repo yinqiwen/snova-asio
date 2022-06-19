@@ -32,5 +32,5 @@
 #include "absl/strings/string_view.h"
 
 namespace snova {
-int parse_http_hostport(absl::string_view recv_data, absl::string_view& hostport);
+int parse_http_hostport(absl::string_view recv_data, absl::string_view* hostport);
 }

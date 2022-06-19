@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
 #include <string_view>
 #include "asio.hpp"
 #include "snova/io/io.h"
@@ -36,6 +38,9 @@
 #include "snova/mux/mux_stream.h"
 
 namespace snova {
+asio::awaitable<void> relay_direct(::asio::ip::tcp::socket&& sock, const Bytes& readed_data,
+                                   const std::string& remote_host, uint16_t remote_port,
+                                   bool is_tcp);
 asio::awaitable<void> relay(::asio::ip::tcp::socket&& sock, const Bytes& readed_data,
                             const std::string& remote_host, uint16_t remote_port, bool is_tcp);
 asio::awaitable<void> relay(StreamPtr stream, const Bytes& readed_data,

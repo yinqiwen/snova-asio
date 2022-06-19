@@ -30,6 +30,7 @@
 #pragma once
 #include <memory>
 #include <tuple>
+#include <utility>
 #include <vector>
 #include "absl/types/span.h"
 #include "asio.hpp"
@@ -62,6 +63,7 @@ struct Stream {
 };
 using StreamPtr = std::shared_ptr<Stream>;
 using SocketRef = ::asio::ip::tcp::socket&;
+using IOBufRef = IOBuf&;
 
 void register_io_stat();
 

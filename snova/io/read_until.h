@@ -33,6 +33,6 @@
 #include "snova/io/io.h"
 
 namespace snova {
-asio::awaitable<int> read_until(::asio::ip::tcp::socket& socket, IOBuf& buf, size_t& readed_len,
+asio::awaitable<int> read_until(SocketRef socket, IOBufRef buf, size_t& readed_len,
                                 std::string_view until);
 }

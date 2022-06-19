@@ -27,6 +27,7 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/mux/mux_connection.h"
+#include <utility>
 #include "asio/experimental/as_tuple.hpp"
 #include "asio/experimental/promise.hpp"
 #include "snova/util/flags.h"
@@ -76,12 +77,12 @@ MuxConnection::MuxConnection(::asio::ip::tcp::socket&& sock,
   read_buffer_.resize(2 * kMaxChunkSize);
   g_mux_conn_num++;
   expire_at_unix_secs_ = (time(nullptr) + g_connection_expire_secs + random_uint64(0, 60));
-  latest_window_recv_bytes_.resize(30);
-  latest_window_send_bytes_.resize(30);
+  latest_window_recv_bytes_.resize(32);
+  latest_window_send_bytes_.resize(32);
 }
 
 void MuxConnection::ResetCounter(uint32_t now) {
-  for (uint32_t i = 0; i < 3; i++) {
+  for (uint32_t i = 0; i < 2; i++) {
     latest_window_recv_bytes_[(now + 1 + i) % latest_window_recv_bytes_.size()] = 0;
     latest_window_send_bytes_[(now + 1 + i) % latest_window_send_bytes_.size()] = 0;
   }
@@ -358,16 +359,16 @@ asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev)
     // co_await write_mutex_.unlock();
     co_return false;
   }
-  auto cancel_write_timeout = TimeWheel::GetInstance()->Add(
-      [this]() -> asio::awaitable<void> {
-        socket_.close();
-        co_return;
-      },
-      g_tcp_write_timeout_secs);
+  // auto cancel_write_timeout = TimeWheel::GetInstance()->Add(
+  //     [this]() -> asio::awaitable<void> {
+  //       socket_.close();
+  //       co_return;
+  //     },
+  //     g_tcp_write_timeout_secs);
   auto [ec, n] =
       co_await ::asio::async_write(socket_, ::asio::buffer(wbuffer.data(), wbuffer.size()),
                                    ::asio::experimental::as_tuple(::asio::use_awaitable));
-  cancel_write_timeout();
+  // cancel_write_timeout();
   co_await write_mutex_.Unlock();
   // co_await write_mutex_.unlock();
   if (ec) {

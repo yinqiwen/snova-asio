@@ -28,8 +28,9 @@
  */
 #include "snova/mux/cipher_context.h"
 #include <gtest/gtest.h>
+#include <utility>
 #include "snova/log/log_macros.h"
-using namespace snova;
+using namespace snova;  // NOLINT
 
 TEST(CipherContext, Chacha20Poly1305) {
   std::unique_ptr<CipherContext> ctx = CipherContext::New("chacha20_poly1305", "hello,world");

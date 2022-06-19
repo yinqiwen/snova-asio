@@ -28,6 +28,7 @@
  */
 #include "snova/mux/mux_client.h"
 #include <memory>
+#include <utility>
 
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/log/log_macros.h"
@@ -48,7 +49,7 @@ asio::awaitable<std::error_code> MuxClient::NewConnection(uint32_t idx) {
   }
   auto ex = co_await asio::this_coro::executor;
   ::asio::ip::tcp::socket socket(ex);
-  if (g_http_proxy_host.empty()) {
+  if (GlobalFlags::GetIntance()->GetHttpProxyHost().empty()) {
     auto [ec] = co_await socket.async_connect(
         remote_endpoint_, ::asio::experimental::as_tuple(::asio::use_awaitable));
     if (ec) {
@@ -56,8 +57,8 @@ asio::awaitable<std::error_code> MuxClient::NewConnection(uint32_t idx) {
       co_return ec;
     }
   } else {
-    auto ec = co_await connect_remote_via_http_proxy(socket, remote_endpoint_, g_http_proxy_host,
-                                                     g_http_proxy_port);
+    auto ec = co_await connect_remote_via_http_proxy(
+        socket, remote_endpoint_, GlobalFlags::GetIntance()->GetHttpProxyHost(), g_http_proxy_port);
     if (ec) {
       SNOVA_ERROR("Failed to connect:{} via http proxy with error:{}", remote_endpoint_, ec);
       co_return ec;
@@ -92,7 +93,7 @@ asio::awaitable<std::error_code> MuxClient::Init(const std::string& user,
   // remote_conns_.resize(g_conn_num_per_server);
   remote_session_ = MuxConnManager::GetInstance()->GetSession(auth_user_, client_id_);
   remote_session_->conns.resize(g_conn_num_per_server);
-  PaserEndpointResult parse_result = parse_endpoint(g_remote_server);
+  PaserEndpointResult parse_result = parse_endpoint(GlobalFlags::GetIntance()->GetRemoteServer());
   if (parse_result.second) {
     co_return parse_result.second;
   }

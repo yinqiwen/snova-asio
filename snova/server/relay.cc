@@ -29,6 +29,7 @@
 #include "snova/server/relay.h"
 
 #include <type_traits>
+#include <utility>
 
 #include "absl/cleanup/cleanup.h"
 #include "asio/experimental/as_tuple.hpp"
@@ -39,14 +40,14 @@
 #include "snova/util/net_helper.h"
 #include "snova/util/time_wheel.h"
 
-using namespace asio::experimental::awaitable_operators;
+using namespace asio::experimental::awaitable_operators;  // NOLINT
 namespace snova {
 
 using CloseFunc = std::function<asio::awaitable<std::error_code>()>;
 template <typename T>
 static asio::awaitable<void> do_relay(T& local_stream, const Bytes& readed_data,
                                       const std::string& remote_host, uint16_t remote_port,
-                                      bool is_tcp) {
+                                      bool is_tcp, bool direct) {
   TransferRoutineFunc transfer_routine;
   uint32_t latest_io_time = time(nullptr);
   CancelFunc cancel_transfer_timeout;
@@ -77,8 +78,7 @@ static asio::awaitable<void> do_relay(T& local_stream, const Bytes& readed_data,
         [&]() -> uint32_t { return latest_io_time; }, g_stream_io_timeout_secs);
   }
 
-  bool direct_relay = g_is_exit_node;
-  // TODO
+  bool direct_relay = (g_is_exit_node || direct);
   if (direct_relay) {
     auto remote_socket = co_await get_connected_socket(remote_host, remote_port, is_tcp);
     if (remote_socket) {
@@ -130,13 +130,20 @@ static asio::awaitable<void> do_relay(T& local_stream, const Bytes& readed_data,
 asio::awaitable<void> relay(::asio::ip::tcp::socket&& sock, const Bytes& readed_data,
                             const std::string& remote_host, uint16_t remote_port, bool is_tcp) {
   ::asio::ip::tcp::socket socket(std::move(sock));  //  make rvalue sock not release after co_await
-  co_await do_relay(socket, readed_data, remote_host, remote_port, is_tcp);
+  co_await do_relay(socket, readed_data, remote_host, remote_port, is_tcp, false);
 }
 
 asio::awaitable<void> relay(StreamPtr local_stream, const Bytes& readed_data,
                             const std::string& remote_host, uint16_t remote_port, bool is_tcp) {
-  co_await do_relay(local_stream, readed_data, remote_host, remote_port, is_tcp);
+  co_await do_relay(local_stream, readed_data, remote_host, remote_port, is_tcp, false);
   co_await local_stream->Close(false);
+}
+
+asio::awaitable<void> relay_direct(::asio::ip::tcp::socket&& sock, const Bytes& readed_data,
+                                   const std::string& remote_host, uint16_t remote_port,
+                                   bool is_tcp) {
+  ::asio::ip::tcp::socket socket(std::move(sock));  //  make rvalue sock not release after co_await
+  co_await do_relay(socket, readed_data, remote_host, remote_port, is_tcp, true);
 }
 
 asio::awaitable<void> relay_handler(const std::string& auth_user, uint64_t client_id,
@@ -157,7 +164,7 @@ asio::awaitable<void> relay_handler(const std::string& auth_user, uint64_t clien
     MuxStream::Remove(client_id, local_stream_id);
   };
   co_await do_relay(local_stream, {}, open_request->remote_host, open_request->remote_port,
-                    open_request->is_tcp);
+                    open_request->is_tcp, false);
   co_await local_stream->Close(false);
 }
 

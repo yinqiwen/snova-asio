@@ -31,5 +31,5 @@
 #include <string>
 
 namespace snova {
-int parse_sni(const uint8_t* data, size_t data_len, std::string& sni);
+int parse_sni(const uint8_t* data, size_t data_len, std::string* sni);
 }

@@ -29,7 +29,7 @@
 #include "snova/util/http_helper.h"
 
 namespace snova {
-int parse_http_hostport(absl::string_view recv_data, absl::string_view& hostport) {
+int parse_http_hostport(absl::string_view recv_data, absl::string_view* hostport) {
   absl::string_view host_key = "Host:";
   auto pos = recv_data.find(host_key);
   if (pos == absl::string_view::npos) {
@@ -41,7 +41,7 @@ int parse_http_hostport(absl::string_view recv_data, absl::string_view& hostport
     return -1;
   }
   size_t n = (end_pos - pos - host_key.size());
-  hostport = absl::string_view(recv_data.data() + pos + host_key.size(), n);
+  *hostport = absl::string_view(recv_data.data() + pos + host_key.size(), n);
   //   hostport.assign(recv_data.data() + pos + host_key.size(), n);
   return 0;
 }

@@ -38,14 +38,17 @@ namespace snova {
 using PaserEndpointResult = std::pair<std::unique_ptr<::asio::ip::tcp::endpoint>, std::error_code>;
 PaserEndpointResult parse_endpoint(const std::string& addr);
 
-int get_orig_dst(int fd, ::asio::ip::tcp::endpoint& endpoint);
+bool is_private_address(const ::asio::ip::address& addr);
+
+int get_orig_dst(int fd, ::asio::ip::tcp::endpoint* endpoint);
 
 using SocketPtr = std::unique_ptr<::asio::ip::tcp::socket>;
 asio::awaitable<SocketPtr> get_connected_socket(const std::string& host, uint16_t port,
                                                 bool is_tcp);
 
+using SocketRef = ::asio::ip::tcp::socket&;
 asio::awaitable<std::error_code> connect_remote_via_http_proxy(
-    ::asio::ip::tcp::socket& socket, const ::asio::ip::tcp::endpoint& remote,
-    const std::string& proxy_host, uint32_t proxy_port);
+    SocketRef socket, const ::asio::ip::tcp::endpoint& remote, const std::string& proxy_host,
+    uint32_t proxy_port);
 
 }  // namespace snova

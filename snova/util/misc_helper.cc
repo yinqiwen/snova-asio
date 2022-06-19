@@ -37,7 +37,7 @@ uint64_t random_uint64(uint64_t min, uint64_t max) {
 
   // Define the distribution, by default it goes from 0 to MAX(unsigned long long)
   // or what have you.
-  std::uniform_int_distribution<unsigned long long> distr(min, max);
+  std::uniform_int_distribution<uint64_t> distr(min, max);
   return distr(eng);
 }
 }  // namespace snova

@@ -61,7 +61,7 @@ uint32_t MuxStream::NextID(bool is_client) {
   }
   return g_server_sid.fetch_add(2);
 }
-MuxStreamPtr MuxStream::New(EventWriterFactory&& factory, StreamDataChannelExecutor& ex,
+MuxStreamPtr MuxStream::New(EventWriterFactory&& factory, const StreamDataChannelExecutor& ex,
                             uint64_t client_id, uint32_t sid) {
   MuxStreamPtr p(new MuxStream(std::move(factory), ex, client_id, sid));
   ClientStreamID id{client_id, sid};
@@ -81,7 +81,7 @@ void MuxStream::Remove(uint64_t client_id, uint32_t sid) {
   g_streams.erase(id);
 }
 
-MuxStream::MuxStream(EventWriterFactory&& factory, StreamDataChannelExecutor& ex,
+MuxStream::MuxStream(EventWriterFactory&& factory, const StreamDataChannelExecutor& ex,
                      uint64_t client_id, uint32_t sid)
     : event_writer_factory_(std::move(factory)),
       data_channel_(ex, 1),
