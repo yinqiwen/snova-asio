@@ -38,6 +38,8 @@ namespace snova {
 using PaserEndpointResult = std::pair<std::unique_ptr<::asio::ip::tcp::endpoint>, std::error_code>;
 PaserEndpointResult parse_endpoint(const std::string& addr);
 
+bool is_private_address(const ::asio::ip::address& addr);
+
 int get_orig_dst(int fd, ::asio::ip::tcp::endpoint& endpoint);
 
 using SocketPtr = std::unique_ptr<::asio::ip::tcp::socket>;

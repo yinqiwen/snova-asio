@@ -54,8 +54,13 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
     remote_endpoint = std::make_unique<::asio::ip::tcp::endpoint>();
     if (0 != get_orig_dst(sock.native_handle(), *remote_endpoint)) {
       remote_endpoint.release();
+    } else {
+      if (is_private_address(remote_endpoint->address())) {
+        remote_endpoint.release();
+      }
     }
   }
+  bool has_redirect_address = (remote_endpoint != nullptr);
 
   IOBufPtr buffer = get_iobuf(kMaxChunkSize);
   auto [ec, n] =
@@ -73,9 +78,9 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
   }
   Bytes readable(buffer->data(), n);
   absl::string_view cmd3((const char*)(readable.data()), 3);
-  if (!g_is_redirect_node && (*buffer)[0] == 5) {  // socks5
+  if (!has_redirect_address && (*buffer)[0] == 5) {  // socks5
     co_await handle_socks5_connection(std::move(sock), std::move(buffer), readable);
-  } else if (!g_is_redirect_node && (*buffer)[0] == 4) {  // socks4
+  } else if (!has_redirect_address && (*buffer)[0] == 4) {  // socks4
     SNOVA_ERROR("Socks4 not supported!");
     co_return;
   } else if ((*buffer)[0] == 0x16) {  // tls

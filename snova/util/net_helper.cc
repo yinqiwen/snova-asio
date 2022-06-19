@@ -61,6 +61,28 @@ PaserEndpointResult parse_endpoint(const std::string& addr) {
   return PaserEndpointResult{std::move(endpoint), std::error_code{}};
 }
 
+static std::array<::asio::ip::address_v4_range, 3> g_private_networks = {
+    ::asio::ip::make_network_v4("10.0.0.0/8").hosts(),
+    ::asio::ip::make_network_v4("172.16.0.0/12").hosts(),
+    ::asio::ip::make_network_v4("192.168.0.0/16").hosts(),
+};
+
+bool is_private_address(const ::asio::ip::address& addr) {
+  if (!addr.is_v4()) {
+    return false;
+  }
+  ::asio::ip::address_v4 v4_addr = addr.to_v4();
+  if (v4_addr.is_loopback()) {
+    return true;
+  }
+  for (size_t i = 0; i < sizeof(g_private_networks); i++) {
+    if (g_private_networks[i].find(addr.to_v4()) != g_private_networks[i].end()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 #define SO_ORIGINAL_DST 80
 int get_orig_dst(int fd, ::asio::ip::tcp::endpoint& endpoint) {
 #ifdef __linux__
