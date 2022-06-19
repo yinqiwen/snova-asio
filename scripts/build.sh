@@ -20,7 +20,7 @@ if [ "$#" -ge 1 ]; then
 esac
 fi
 
-echo ${machine} ${platform}
+echo "${machine}" "${platform}"
 
 if [ "$machine" = "Linux" ]; then
     bazel build --define local_musl=true --features=fully_static_link --cxxopt=-std=c++20 --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:"${platform}" //...
