@@ -110,6 +110,11 @@ int main(int argc, char** argv) {
   app.add_option("--exit", snova::g_is_exit_node, "Run as exit node.");
   app.add_option("--redirect", snova::g_is_redirect_node, "Run as redirect server for entry node.");
 
+  app.add_option("--entry_socket_send_buffer_size", snova::g_entry_socket_send_buffer_size,
+                 "Entry server socket send buffer size.");
+  app.add_option("--entry_socket_recv_buffer_size", snova::g_entry_socket_recv_buffer_size,
+                 "Entry server socket recv buffer size.");
+
   CLI11_PARSE(app, argc, argv);
 
   if (!proxy_server.empty()) {

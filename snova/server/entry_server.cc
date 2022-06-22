@@ -124,7 +124,26 @@ static ::asio::awaitable<void> server_loop(::asio::ip::tcp::acceptor server) {
       SNOVA_ERROR("Failed to accept with error:{}", ec.message());
       co_return;
     }
-    // SNOVA_INFO("Receive new local connection.");
+
+    if (g_entry_socket_send_buffer_size > 0) {
+      ::asio::socket_base::send_buffer_size current_send_buffer_size;
+      client.get_option(current_send_buffer_size);
+      if (g_entry_socket_send_buffer_size < current_send_buffer_size.value()) {
+        ::asio::socket_base::send_buffer_size new_send_buffer_size(g_entry_socket_send_buffer_size);
+        client.set_option(new_send_buffer_size);
+      }
+    }
+
+    if (g_entry_socket_recv_buffer_size > 0) {
+      ::asio::socket_base::receive_buffer_size curent_recv_buffer_size;
+      client.get_option(curent_recv_buffer_size);
+      if (g_entry_socket_recv_buffer_size < curent_recv_buffer_size.value()) {
+        ::asio::socket_base::receive_buffer_size new_recv_buffer_size(
+            g_entry_socket_recv_buffer_size);
+        client.set_option(new_recv_buffer_size);
+      }
+    }
+
     auto ex = co_await asio::this_coro::executor;
     ::asio::co_spawn(ex, handle_conn(std::move(client)), ::asio::detached);
   }

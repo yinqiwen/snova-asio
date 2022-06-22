@@ -36,6 +36,7 @@ extern bool g_is_middle_node;
 extern bool g_is_entry_node;
 extern bool g_is_exit_node;
 extern bool g_is_redirect_node;
+
 // extern std::string g_remote_server;
 // extern std::string g_http_proxy_host;
 extern uint16_t g_http_proxy_port;
@@ -44,6 +45,8 @@ extern uint32_t g_connection_expire_secs;
 extern uint32_t g_iobuf_max_pool_size;
 extern uint32_t g_stream_io_timeout_secs;
 extern uint32_t g_tcp_write_timeout_secs;
+extern uint32_t g_entry_socket_send_buffer_size;
+extern uint32_t g_entry_socket_recv_buffer_size;
 
 class GlobalFlags {
  public:
