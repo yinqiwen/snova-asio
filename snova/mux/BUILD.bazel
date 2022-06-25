@@ -32,23 +32,6 @@ cc_library(
     ],
 )
 
-# cc_library(
-#     name = "mux_server",
-#     srcs = [
-#         "mux_server.cc",
-#     ],
-#     hdrs = [
-#         "mux_server.h",
-#     ],
-#     copts = SNOVA_DEFAULT_COPTS,
-#     deps = [
-#         ":mux_connection",
-#         "//snova/log:log_api",
-#         "@asio",
-#         "@com_google_absl//absl/container:flat_hash_map",
-#     ],
-# )
-
 cc_library(
     name = "cipher_context",
     srcs = [
@@ -143,5 +126,6 @@ cc_library(
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
         ":mux_connection",
+        "//snova/util:flags",
     ],
 )
