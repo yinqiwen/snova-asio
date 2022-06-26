@@ -23,8 +23,9 @@ cc_library(
     deps = [
         ":relay",
         "//snova/io",
-        "//snova/io:read_until",
+        "//snova/io:io_util",
         "//snova/log:log_api",
+        "//snova/util:address",
         "//snova/util:flags",
         "//snova/util:http_helper",
         "//snova/util:net_helper",
@@ -48,6 +49,8 @@ cc_library(
     deps = [
         ":relay",
         "//snova/io",
+        "//snova/io:tcp_socket",
+        "//snova/io:ws_socket",
         "//snova/log:log_api",
         "//snova/mux:mux_conn_manager",
         "//snova/mux:mux_connection",

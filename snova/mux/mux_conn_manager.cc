@@ -28,6 +28,7 @@
  */
 #include "snova/mux/mux_conn_manager.h"
 #include <utility>
+#include "snova/util/flags.h"
 namespace snova {
 
 EventWriterFactory MuxSession::GetEventWriterFactory() {
@@ -95,14 +96,18 @@ void MuxConnManager::ReportStatInfo(StatValues& stats) {
           kv[fmt::format("[{}]", i)] = "NULL";
         } else {
           // kv[fmt::format("[{}]read_state", i)] = conn->GetReadState();
-          kv[fmt::format("[{}]inactive_secs", i)] =
-              std::to_string(now - conn->GetLastActiveUnixSecs());
+          auto inactive_secs = now - conn->GetLastActiveUnixSecs();
+          kv[fmt::format("[{}]inactive_secs", i)] = std::to_string(inactive_secs);
           kv[fmt::format("[{}]recv_bytes", i)] = std::to_string(conn->GetRecvBytes());
           kv[fmt::format("[{}]send_bytes", i)] = std::to_string(conn->GetSendBytes());
           kv[fmt::format("[{}]latest_30s_recv_bytes", i)] =
               std::to_string(conn->GetLatestWindowRecvBytes());
           kv[fmt::format("[{}]latest_30s_send_bytes", i)] =
               std::to_string(conn->GetLatestWindowSendBytes());
+
+          if (inactive_secs > g_connection_max_inactive_secs) {
+            conn->Close();
+          }
         }
       }
     }

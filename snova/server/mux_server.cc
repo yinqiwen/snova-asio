@@ -34,26 +34,63 @@
 #include <utility>
 
 #include "absl/cleanup/cleanup.h"
+#include "absl/strings/escaping.h"
 #include "absl/strings/str_split.h"
 #include "asio/experimental/as_tuple.hpp"
+#include "snova/io/tcp_socket.h"
+#include "snova/io/ws_socket.h"
 #include "snova/log/log_macros.h"
 #include "snova/mux/mux_conn_manager.h"
 #include "snova/mux/mux_connection.h"
 #include "snova/server/relay.h"
+#include "snova/util/address.h"
+#include "snova/util/misc_helper.h"
 #include "snova/util/net_helper.h"
 #include "snova/util/stat.h"
 #include "snova/util/time_wheel.h"
 
 namespace snova {
+enum class MuxConnectionType : uint8_t {
+  MUX_OVER_TCP = 0,
+  MUX_OVER_WEBSOCKET,
+  MUX_OVER_TLS,
+  MUX_OVER_TLS_WEBSOCKET,
+};
 static uint32_t g_mux_server_conn_num = 0;
+
 static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock,
+                                           MuxConnectionType conn_type,
                                            const std::string& cipher_method,
                                            const std::string& cipher_key) {
   g_mux_server_conn_num++;
   absl::Cleanup auto_counter = [] { g_mux_server_conn_num--; };
   std::unique_ptr<CipherContext> cipher_ctx = CipherContext::New(cipher_method, cipher_key);
+  IOConnectionPtr io_conn;
+
+  switch (conn_type) {
+    case MuxConnectionType::MUX_OVER_TCP: {
+      io_conn = std::make_unique<TcpSocket>(std::move(sock));
+      break;
+    }
+    case MuxConnectionType::MUX_OVER_WEBSOCKET: {
+      IOConnectionPtr tcp_conn = std::make_unique<TcpSocket>(std::move(sock));
+      auto ws_conn = std::make_unique<WebSocket>(std::move(tcp_conn));
+      auto ec = co_await ws_conn->AsyncAccept();
+      if (ec) {
+        SNOVA_ERROR("Failed to handshake from ws client:{}", ec);
+        co_return;
+      }
+      io_conn = std::move(ws_conn);
+      break;
+    }
+    default: {
+      SNOVA_ERROR("Unsupported connection type:{}", static_cast<uint8_t>(conn_type));
+      co_return;
+    }
+  }
+
   MuxConnectionPtr mux_conn =
-      std::make_shared<MuxConnection>(std::move(sock), std::move(cipher_ctx), false);
+      std::make_shared<MuxConnection>(std::move(io_conn), std::move(cipher_ctx), false);
   auto [auth_user, client_id, auth_success] = co_await mux_conn->ServerAuth();
   if (!auth_success) {
     SNOVA_ERROR("Server auth failed!");
@@ -84,6 +121,7 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock,
 }
 
 static ::asio::awaitable<void> server_loop(::asio::ip::tcp::acceptor server,
+                                           MuxConnectionType conn_type,
                                            const std::string& cipher_method,
                                            const std::string& cipher_key) {
   while (true) {
@@ -95,7 +133,7 @@ static ::asio::awaitable<void> server_loop(::asio::ip::tcp::acceptor server,
     }
     SNOVA_INFO("Receive new connection.");
     auto ex = co_await asio::this_coro::executor;
-    ::asio::co_spawn(ex, handle_conn(std::move(client), cipher_method, cipher_key),
+    ::asio::co_spawn(ex, handle_conn(std::move(client), conn_type, cipher_method, cipher_key),
                      ::asio::detached);
   }
   co_return;
@@ -115,12 +153,22 @@ asio::awaitable<std::error_code> start_mux_server(const std::string& addr,
   if (!cipher_ctx) {
     co_return std::make_error_code(std::errc::invalid_argument);
   }
-  PaserEndpointResult parse_result = parse_endpoint(addr);
+  PaserAddressResult parse_result = NetAddress::Parse(addr);
   if (parse_result.second) {
     co_return parse_result.second;
   }
+  auto server_address = std::move(parse_result.first);
+  MuxConnectionType conn_type = MuxConnectionType::MUX_OVER_TCP;
+  if (server_address->schema == "ws") {
+    conn_type = MuxConnectionType::MUX_OVER_WEBSOCKET;
+  }
+
   auto ex = co_await asio::this_coro::executor;
-  ::asio::ip::tcp::endpoint& endpoint = *parse_result.first;
+  ::asio::ip::tcp::endpoint endpoint;
+  auto resolve_ec = co_await server_address->GetEndpoint(&endpoint);
+  if (resolve_ec) {
+    co_return resolve_ec;
+  }
   ::asio::ip::tcp::acceptor acceptor(ex);
   acceptor.open(endpoint.protocol());
   acceptor.set_option(::asio::socket_base::reuse_address(true));
@@ -136,8 +184,9 @@ asio::awaitable<std::error_code> start_mux_server(const std::string& addr,
     co_return ec;
   }
 
-  ::asio::co_spawn(ex, server_loop(std::move(acceptor), cipher_method, cipher_key),
+  ::asio::co_spawn(ex, server_loop(std::move(acceptor), conn_type, cipher_method, cipher_key),
                    ::asio::detached);
   co_return ec;
 }
+
 }  // namespace snova

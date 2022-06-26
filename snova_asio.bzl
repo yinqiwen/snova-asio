@@ -80,6 +80,12 @@ cc_library(
         build_file = clean_dep("//:bazel/mbedtls.BUILD"),
     )
 
+    git_repository(
+        name = "com_github_google_borringssl",
+        branch = "master-with-bazel",
+        remote = "https://github.com/google/boringssl.git",
+    )
+
     gtest_ver = kwargs.get("gtest_ver", "1.11.0")
     gtest_name = "googletest-release-{ver}".format(ver = gtest_ver)
     http_archive(

@@ -34,6 +34,7 @@
 
 #include "asio.hpp"
 #include "snova/mux/mux_conn_manager.h"
+#include "snova/util/address.h"
 #include "snova/util/stat.h"
 namespace snova {
 class MuxClient {
@@ -51,7 +52,8 @@ class MuxClient {
 
   MuxSessionPtr remote_session_;
   // std::vector<MuxConnectionPtr> remote_conns_;
-  ::asio::ip::tcp::endpoint remote_endpoint_;
+  std::unique_ptr<NetAddress> remote_mux_address_;
+  // ::asio::ip::tcp::endpoint remote_endpoint_;
   std::string auth_user_;
   std::string cipher_method_;
   std::string cipher_key_;

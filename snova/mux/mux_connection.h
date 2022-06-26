@@ -58,8 +58,7 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
  public:
   static size_t Size();
   static size_t ActiveSize();
-  MuxConnection(::asio::ip::tcp::socket&& sock, std::unique_ptr<CipherContext>&& cipher_ctx,
-                bool is_local);
+  MuxConnection(IOConnectionPtr&& conn, std::unique_ptr<CipherContext>&& cipher_ctx, bool is_local);
   asio::awaitable<bool> ClientAuth(const std::string& user, uint64_t client_id);
   asio::awaitable<ServerAuthResult> ServerAuth();
   asio::awaitable<void> ReadEventLoop();
@@ -108,7 +107,8 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
   int ReadEventFromBuffer(std::unique_ptr<MuxEvent>& event, Bytes& buffer);
   asio::awaitable<int> ReadEvent(std::unique_ptr<MuxEvent>& event);
 
-  ::asio::ip::tcp::socket socket_;
+  // ::asio::ip::tcp::socket socket_;
+  IOConnectionPtr io_conn_;
   std::unique_ptr<CipherContext> cipher_ctx_;
   AsyncChannelMutex write_mutex_;
   // cppcoro::async_mutex write_mutex_;

@@ -26,41 +26,25 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "snova/util/http_helper.h"
-#include "absl/strings/escaping.h"
-#include "absl/strings/str_split.h"
-#include "snova/util/misc_helper.h"
+
+#pragma once
+#include <memory>
+#include <string>
+#include <system_error>
+#include <utility>
+#include "asio.hpp"
 
 namespace snova {
-int parse_http_hostport(absl::string_view recv_data, absl::string_view* hostport) {
-  return http_get_header(recv_data, "Host:", hostport);
-}
-int http_get_header(absl::string_view recv_data, absl::string_view header, absl::string_view* val) {
-  auto pos = recv_data.find(header);
-  if (pos == absl::string_view::npos) {
-    return -1;
-  }
-  absl::string_view crlf = "\r\n";
-  auto end_pos = recv_data.find(crlf, pos);
-  if (end_pos == absl::string_view::npos) {
-    return -1;
-  }
-  size_t n = (end_pos - pos - header.size());
-
-  absl::string_view tmp(recv_data.data() + pos + header.size(), n);
-
-  *val = absl::StripAsciiWhitespace(tmp);
-  // printf("#### n:%d %d  %s\n", n, val->size(), tmp.data());
-  return 0;
-}
-
-void ws_get_accept_secret_key(absl::string_view key, std::string* accept_key) {
-  std::string encode_key(key.data(), key.size());
-  encode_key.append("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
-  std::string resp_bin_key;
-  sha1_sum(encode_key, resp_bin_key);
-  std::string resp_text_key;
-  absl::Base64Escape(resp_bin_key, accept_key);
-}
+struct NetAddress;
+using PaserAddressResult = std::pair<std::unique_ptr<NetAddress>, std::error_code>;
+struct NetAddress {
+  std::string schema;
+  std::string host;
+  uint16_t port = 0;
+  std::string path;
+  asio::awaitable<std::error_code> GetEndpoint(::asio::ip::tcp::endpoint* endpoint);
+  std::string String() const;
+  static PaserAddressResult Parse(const std::string& addr);
+};
 
 }  // namespace snova

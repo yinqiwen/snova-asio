@@ -26,41 +26,38 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "snova/util/http_helper.h"
-#include "absl/strings/escaping.h"
-#include "absl/strings/str_split.h"
-#include "snova/util/misc_helper.h"
 
+#pragma once
+#include <memory>
+#include <vector>
+#include "asio.hpp"
+#include "asio/experimental/as_tuple.hpp"
+#include "snova/io/io.h"
 namespace snova {
-int parse_http_hostport(absl::string_view recv_data, absl::string_view* hostport) {
-  return http_get_header(recv_data, "Host:", hostport);
-}
-int http_get_header(absl::string_view recv_data, absl::string_view header, absl::string_view* val) {
-  auto pos = recv_data.find(header);
-  if (pos == absl::string_view::npos) {
-    return -1;
+class TcpSocket : public IOConnection {
+ public:
+  explicit TcpSocket(::asio::ip::tcp::socket& sock);
+  explicit TcpSocket(::asio::ip::tcp::socket&& sock);
+
+  asio::any_io_executor GetExecutor() override;
+  asio::awaitable<IOResult> AsyncWrite(const asio::const_buffer& buffers) override {
+    co_return co_await DoAsyncWrite(buffers);
   }
-  absl::string_view crlf = "\r\n";
-  auto end_pos = recv_data.find(crlf, pos);
-  if (end_pos == absl::string_view::npos) {
-    return -1;
+  asio::awaitable<IOResult> AsyncWrite(const std::vector<::asio::const_buffer>& buffers) override {
+    co_return co_await DoAsyncWrite(buffers);
   }
-  size_t n = (end_pos - pos - header.size());
+  asio::awaitable<IOResult> AsyncRead(const asio::mutable_buffer& buffers) override;
+  void Close() override;
 
-  absl::string_view tmp(recv_data.data() + pos + header.size(), n);
-
-  *val = absl::StripAsciiWhitespace(tmp);
-  // printf("#### n:%d %d  %s\n", n, val->size(), tmp.data());
-  return 0;
-}
-
-void ws_get_accept_secret_key(absl::string_view key, std::string* accept_key) {
-  std::string encode_key(key.data(), key.size());
-  encode_key.append("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
-  std::string resp_bin_key;
-  sha1_sum(encode_key, resp_bin_key);
-  std::string resp_text_key;
-  absl::Base64Escape(resp_bin_key, accept_key);
-}
+ private:
+  template <typename T>
+  asio::awaitable<IOResult> DoAsyncWrite(const T& buffers) {
+    auto [ec, n] = co_await ::asio::async_write(
+        socket_, buffers, ::asio::experimental::as_tuple(::asio::use_awaitable));
+    co_return IOResult{n, ec};
+  }
+  std::unique_ptr<::asio::ip::tcp::socket> own_socket_;
+  ::asio::ip::tcp::socket& socket_;
+};
 
 }  // namespace snova

@@ -7,7 +7,7 @@ MIMALLOC_COPTS = select({
     "//conditions:default": [
         "-O3",
         "-std=gnu11",
-        "-fPIC",
+        # "-fPIC",
         "-Wall -Wextra -Wno-unknown-pragmas",
         "-fvisibility=hidden",
         "-Wstrict-prototypes",

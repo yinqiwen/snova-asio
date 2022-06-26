@@ -88,7 +88,7 @@ jobs:
         run: echo BUILD_VERSION="${GITHUB_SHA}" >> "$GITHUB_ENV"
       - uses: bazelbuild/setup-bazelisk@v2
       - name: MacX64Build
-        run:  bazel build --features=fully_static_link --cxxopt=-std=c++20 --cxxopt=-DSNOVA_VERSION="${BUILD_VERSION}" //...
+        run:  bazel build --features=fully_static_link --copt=-flto --linkopt=-flto --cxxopt=-std=c++20 --cxxopt=-DSNOVA_VERSION="${BUILD_VERSION}" //...
       - run: tar czf snova_asio_"${BUILD_VERSION}"_darwin_amd64.tar.gz -C ./bazel-bin/snova/app/ snova
       - name: Release
         uses: softprops/action-gh-release@v1

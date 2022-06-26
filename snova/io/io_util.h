@@ -35,4 +35,8 @@
 namespace snova {
 asio::awaitable<int> read_until(SocketRef socket, IOBufRef buf, size_t& readed_len,
                                 std::string_view until);
-}
+asio::awaitable<int> read_until(IOConnection& socket, IOBufRef buf, size_t& readed_len,
+                                std::string_view until);
+asio::awaitable<std::error_code> read_exact(IOConnection& socket,
+                                            const asio::mutable_buffer& buffers);
+}  // namespace snova

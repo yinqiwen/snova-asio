@@ -26,41 +26,43 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "snova/util/http_helper.h"
-#include "absl/strings/escaping.h"
-#include "absl/strings/str_split.h"
-#include "snova/util/misc_helper.h"
+#include "snova/io/buffered_io.h"
+#include <utility>
+
+#include "asio/experimental/as_tuple.hpp"
 
 namespace snova {
-int parse_http_hostport(absl::string_view recv_data, absl::string_view* hostport) {
-  return http_get_header(recv_data, "Host:", hostport);
+BufferedIO::BufferedIO(IOConnectionPtr&& io) : io_(std::move(io)), offset_(0), length_(0) {
+  recv_buffer_ = get_iobuf(kMaxChunkSize);
 }
-int http_get_header(absl::string_view recv_data, absl::string_view header, absl::string_view* val) {
-  auto pos = recv_data.find(header);
-  if (pos == absl::string_view::npos) {
-    return -1;
+
+asio::any_io_executor BufferedIO::GetExecutor() { return io_->GetExecutor(); }
+asio::awaitable<IOResult> BufferedIO::AsyncWrite(const asio::const_buffer& buffers) {
+  co_return co_await io_->AsyncWrite(buffers);
+}
+asio::awaitable<IOResult> BufferedIO::AsyncWrite(const std::vector<::asio::const_buffer>& buffers) {
+  co_return co_await io_->AsyncWrite(buffers);
+}
+asio::awaitable<IOResult> BufferedIO::AsyncRead(const asio::mutable_buffer& buffers) {
+  if (offset_ >= length_) {
+    offset_ = 0;
+    length_ = 0;
+    auto [n, ec] = co_await io_->AsyncRead(::asio::buffer(recv_buffer_->data(), kMaxChunkSize));
+    if (ec) {
+      co_return IOResult{0, ec};
+    }
+    length_ = n;
   }
-  absl::string_view crlf = "\r\n";
-  auto end_pos = recv_data.find(crlf, pos);
-  if (end_pos == absl::string_view::npos) {
-    return -1;
+  if (offset_ < length_) {
+    size_t read_len = (length_ - offset_);
+    if (buffers.size() < read_len) {
+      read_len = buffers.size();
+    }
+    memcpy(buffers.data(), recv_buffer_->data() + offset_, read_len);
+    offset_ += read_len;
+    co_return IOResult{read_len, std::error_code{}};
   }
-  size_t n = (end_pos - pos - header.size());
-
-  absl::string_view tmp(recv_data.data() + pos + header.size(), n);
-
-  *val = absl::StripAsciiWhitespace(tmp);
-  // printf("#### n:%d %d  %s\n", n, val->size(), tmp.data());
-  return 0;
+  co_return IOResult{0, std::error_code{}};
 }
-
-void ws_get_accept_secret_key(absl::string_view key, std::string* accept_key) {
-  std::string encode_key(key.data(), key.size());
-  encode_key.append("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
-  std::string resp_bin_key;
-  sha1_sum(encode_key, resp_bin_key);
-  std::string resp_text_key;
-  absl::Base64Escape(resp_bin_key, accept_key);
-}
-
+void BufferedIO::Close() { io_->Close(); }
 }  // namespace snova

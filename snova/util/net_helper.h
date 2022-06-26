@@ -35,8 +35,6 @@
 #include <utility>
 #include "asio.hpp"
 namespace snova {
-using PaserEndpointResult = std::pair<std::unique_ptr<::asio::ip::tcp::endpoint>, std::error_code>;
-PaserEndpointResult parse_endpoint(const std::string& addr);
 
 bool is_private_address(const ::asio::ip::address& addr);
 
@@ -47,8 +45,11 @@ asio::awaitable<SocketPtr> get_connected_socket(const std::string& host, uint16_
                                                 bool is_tcp);
 
 using SocketRef = ::asio::ip::tcp::socket&;
-asio::awaitable<std::error_code> connect_remote_via_http_proxy(
-    SocketRef socket, const ::asio::ip::tcp::endpoint& remote, const std::string& proxy_host,
-    uint32_t proxy_port);
-
+asio::awaitable<std::error_code> connect_remote_via_http_proxy(SocketRef socket,
+                                                               const std::string& remote_host,
+                                                               uint16_t remote_port,
+                                                               const std::string& proxy_host,
+                                                               uint16_t proxy_port);
+asio::awaitable<std::error_code> resolve_endpoint(const std::string& host, uint16_t port,
+                                                  ::asio::ip::tcp::endpoint* endpoint);
 }  // namespace snova

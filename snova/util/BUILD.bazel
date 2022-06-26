@@ -71,6 +71,23 @@ cc_library(
 )
 
 cc_library(
+    name = "address",
+    srcs = [
+        "address.cc",
+    ],
+    hdrs = [
+        "address.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        ":net_helper",
+        "//snova/log:log_api",
+        "@asio",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
     name = "net_helper",
     srcs = [
         "net_helper.cc",
@@ -80,7 +97,7 @@ cc_library(
     ],
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
-        "//snova/io:read_until",
+        "//snova/io:io_util",
         "//snova/log:log_api",
         "@asio",
         "@com_google_absl//absl/strings",
@@ -122,6 +139,7 @@ cc_library(
     ],
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
+        ":misc_helper",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -135,4 +153,5 @@ cc_library(
         "misc_helper.h",
     ],
     copts = SNOVA_DEFAULT_COPTS,
+    deps = ["@com_github_mbedtls//:mbedtls"],
 )

@@ -31,6 +31,9 @@
 #include <utility>
 
 #include "asio/experimental/as_tuple.hpp"
+#include "snova/io/tcp_socket.h"
+// #include "snova/io/tls_socket.h"
+#include "snova/io/ws_socket.h"
 #include "snova/log/log_macros.h"
 #include "snova/util/flags.h"
 #include "snova/util/net_helper.h"
@@ -50,30 +53,60 @@ asio::awaitable<std::error_code> MuxClient::NewConnection(uint32_t idx) {
   auto ex = co_await asio::this_coro::executor;
   ::asio::ip::tcp::socket socket(ex);
   if (GlobalFlags::GetIntance()->GetHttpProxyHost().empty()) {
+    ::asio::ip::tcp::endpoint remote_endpoint;
+    auto resolve_ec = co_await remote_mux_address_->GetEndpoint(&remote_endpoint);
+    if (resolve_ec) {
+      co_return resolve_ec;
+    }
     auto [ec] = co_await socket.async_connect(
-        remote_endpoint_, ::asio::experimental::as_tuple(::asio::use_awaitable));
+        remote_endpoint, ::asio::experimental::as_tuple(::asio::use_awaitable));
     if (ec) {
-      SNOVA_ERROR("Failed to connect:{} with error:{}", remote_endpoint_, ec);
+      SNOVA_ERROR("Failed to connect:{} with error:{}", remote_mux_address_->String(), ec);
       co_return ec;
     }
   } else {
     auto ec = co_await connect_remote_via_http_proxy(
-        socket, remote_endpoint_, GlobalFlags::GetIntance()->GetHttpProxyHost(), g_http_proxy_port);
+        socket, remote_mux_address_->host, remote_mux_address_->port,
+        GlobalFlags::GetIntance()->GetHttpProxyHost(), g_http_proxy_port);
     if (ec) {
-      SNOVA_ERROR("Failed to connect:{} via http proxy with error:{}", remote_endpoint_, ec);
+      SNOVA_ERROR("Failed to connect:{} via http proxy with error:{}",
+                  remote_mux_address_->String(), ec);
       co_return ec;
     }
   }
+  IOConnectionPtr raw_io_conn = std::make_unique<TcpSocket>(std::move(socket));
+  // if (remote_mux_address_->schema == "tls" || remote_mux_address_->schema == "wss") {
+  //   auto tls_conn = std::make_unique<TlsSocket>(std::move(socket));
+  //   auto handshake_ec = co_await tls_conn->ClientHandshake();
+  //   if (handshake_ec) {
+  //     co_return handshake_ec;
+  //   }
+  //   raw_io_conn = std::move(tls_conn);
+  // } else {
+  //   raw_io_conn = std::make_unique<TcpSocket>(std::move(socket));
+  // }
+  IOConnectionPtr io_conn;
+  if (remote_mux_address_->schema == "ws" || remote_mux_address_->schema == "wss") {
+    auto ws_conn = std::make_unique<WebSocket>(std::move(raw_io_conn));
+    auto conn_ec = co_await ws_conn->AsyncConnect(remote_mux_address_->host);
+    if (conn_ec) {
+      co_return conn_ec;
+    }
+    io_conn = std::move(ws_conn);
+  } else {
+    io_conn = std::move(raw_io_conn);
+  }
 
   std::unique_ptr<CipherContext> cipher_ctx = CipherContext::New(cipher_method_, cipher_key_);
+
   MuxConnectionPtr conn =
-      std::make_shared<MuxConnection>(std::move(socket), std::move(cipher_ctx), true);
+      std::make_shared<MuxConnection>(std::move(io_conn), std::move(cipher_ctx), true);
   bool auth_success = co_await conn->ClientAuth(auth_user_, client_id_);
   if (!auth_success) {
     co_return std::make_error_code(std::errc::invalid_argument);
   }
   conn->SetIdx(idx);
-  SNOVA_INFO("[{}]Success to connect:{}", idx, remote_endpoint_);
+  SNOVA_INFO("[{}]Success to connect:{}", idx, remote_mux_address_->String());
   ::asio::co_spawn(
       ex,
       [this, idx, conn]() -> asio::awaitable<void> {
@@ -93,10 +126,11 @@ asio::awaitable<std::error_code> MuxClient::Init(const std::string& user,
   // remote_conns_.resize(g_conn_num_per_server);
   remote_session_ = MuxConnManager::GetInstance()->GetSession(auth_user_, client_id_);
   remote_session_->conns.resize(g_conn_num_per_server);
-  PaserEndpointResult parse_result = parse_endpoint(GlobalFlags::GetIntance()->GetRemoteServer());
+  PaserAddressResult parse_result = NetAddress::Parse(GlobalFlags::GetIntance()->GetRemoteServer());
   if (parse_result.second) {
     co_return parse_result.second;
   }
+  remote_mux_address_ = std::move(parse_result.first);
   std::unique_ptr<CipherContext> cipher_ctx = CipherContext::New(cipher_method, cipher_key);
   if (!cipher_ctx) {
     SNOVA_ERROR("Invalid cipher_method:{} cipher_key:{}", cipher_method, cipher_key);
@@ -106,7 +140,6 @@ asio::awaitable<std::error_code> MuxClient::Init(const std::string& user,
   cipher_method_ = cipher_method;
   cipher_key_ = cipher_key;
 
-  remote_endpoint_ = *parse_result.first;
   auto ec = co_await NewConnection(0);
   if (ec) {
     co_return ec;

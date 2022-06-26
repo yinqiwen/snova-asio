@@ -26,13 +26,12 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "snova/io/read_until.h"
-#include "asio/experimental/as_tuple.hpp"
+#include "snova/io/io_util.h"
+#include "snova/io/tcp_socket.h"
 #include "snova/log/log_macros.h"
-#include "spdlog/fmt/bundled/ostream.h"
 
 namespace snova {
-asio::awaitable<int> read_until(SocketRef socket, IOBufRef buf, size_t& readed_len,
+asio::awaitable<int> read_until(IOConnection& socket, IOBufRef buf, size_t& readed_len,
                                 std::string_view until) {
   int rc = 0;
   while (true) {
@@ -45,9 +44,8 @@ asio::awaitable<int> read_until(SocketRef socket, IOBufRef buf, size_t& readed_l
     if (rest < until.size()) {
       buf.resize(buf.size() * 2);
     }
-    auto [ec, n] = co_await socket.async_read_some(
-        ::asio::buffer(buf.data() + readed_len, buf.size() - readed_len),
-        ::asio::experimental::as_tuple(::asio::use_awaitable));
+    auto [n, ec] =
+        co_await socket.AsyncRead(::asio::buffer(buf.data() + readed_len, buf.size() - readed_len));
     if (n > 0) {
       readed_len += n;
     } else {
@@ -58,4 +56,25 @@ asio::awaitable<int> read_until(SocketRef socket, IOBufRef buf, size_t& readed_l
   }
   co_return rc;
 }
+asio::awaitable<int> read_until(SocketRef socket, IOBufRef buf, size_t& readed_len,
+                                std::string_view until) {
+  TcpSocket tcp(socket);
+  co_return co_await read_until(tcp, buf, readed_len, until);
+}
+asio::awaitable<std::error_code> read_exact(IOConnection& socket,
+                                            const asio::mutable_buffer& buffers) {
+  size_t pos = 0;
+  size_t rest = buffers.size();
+  uint8_t* read_buffer = reinterpret_cast<uint8_t*>(buffers.data());
+  while (rest > 0) {
+    auto [n, ec] = co_await socket.AsyncRead(::asio::buffer(read_buffer + pos, rest));
+    if (ec) {
+      co_return ec;
+    }
+    rest -= n;
+    pos += n;
+  }
+  co_return std::error_code{};
+}
+
 }  // namespace snova
