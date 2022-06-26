@@ -27,6 +27,7 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/io/tcp_socket.h"
+#include <utility>
 
 #include "asio/experimental/as_tuple.hpp"
 

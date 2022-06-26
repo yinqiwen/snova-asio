@@ -29,6 +29,7 @@
 
 #pragma once
 #include <memory>
+#include <string>
 #include "asio.hpp"
 #include "asio/ssl.hpp"
 #include "snova/io/io.h"
@@ -38,8 +39,8 @@ using ASIOTlsSocket = ::asio::ssl::stream<::asio::ip::tcp::socket>;
 using ASIOTlsSocketExecutor = typename ASIOTlsSocket::executor_type;
 class TlsSocket : public IOConnection {
  public:
-  TlsSocket(::asio::ip::tcp::socket&& sock);
-  TlsSocket(const ASIOTlsSocketExecutor& ex);
+  explicit TlsSocket(::asio::ip::tcp::socket&& sock);
+  explicit TlsSocket(const ASIOTlsSocketExecutor& ex);
   asio::any_io_executor GetExecutor() override;
   asio::awaitable<std::error_code> ClientHandshake();
   asio::awaitable<std::error_code> AsyncConnect(const std::string& host, uint16_t port);

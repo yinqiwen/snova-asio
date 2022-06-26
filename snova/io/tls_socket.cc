@@ -27,6 +27,8 @@
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "snova/io/tls_socket.h"
+#include <string>
+#include <utility>
 #include "asio/experimental/as_tuple.hpp"
 
 namespace snova {

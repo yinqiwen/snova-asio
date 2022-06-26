@@ -107,7 +107,7 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
   int ReadEventFromBuffer(std::unique_ptr<MuxEvent>& event, Bytes& buffer);
   asio::awaitable<int> ReadEvent(std::unique_ptr<MuxEvent>& event);
 
-  //::asio::ip::tcp::socket socket_;
+  // ::asio::ip::tcp::socket socket_;
   IOConnectionPtr io_conn_;
   std::unique_ptr<CipherContext> cipher_ctx_;
   AsyncChannelMutex write_mutex_;

@@ -53,24 +53,24 @@ TEST(TlsSocket, Simple) {
   ctx.run();
 }
 
-TEST(TlsSocket, Simple2) {
-  ::asio::io_context ctx;
+// TEST(TlsSocket, Simple2) {
+//   ::asio::io_context ctx;
 
-  ::asio::co_spawn(
-      ctx,
-      []() mutable -> asio::awaitable<void> {
-        auto ex = co_await asio::this_coro::executor;
-        ::asio::ip::tcp::socket sock(ex);
-        TlsSocket socket(std::move(sock));
-        co_await socket.AsyncConnect("www.baidu.com", 443);
-        std::string req = "GET / HTTP/1.0\r\n\r\n";
-        co_await socket.AsyncWrite(::asio::buffer(req.data(), req.size()));
-        char buffer[4096];
-        auto [n, ec] = co_await socket.AsyncRead(::asio::buffer(buffer, 4096));
-        if (n > 0) {
-          SNOVA_INFO("Recv:{}", std::string_view(buffer, n));
-        }
-      },
-      ::asio::detached);
-  ctx.run();
-}
+//   ::asio::co_spawn(
+//       ctx,
+//       []() mutable -> asio::awaitable<void> {
+//         auto ex = co_await asio::this_coro::executor;
+//         ::asio::ip::tcp::socket sock(ex);
+//         TlsSocket socket(std::move(sock));
+//         co_await socket.AsyncConnect("www.baidu.com", 443);
+//         std::string req = "GET / HTTP/1.0\r\n\r\n";
+//         co_await socket.AsyncWrite(::asio::buffer(req.data(), req.size()));
+//         char buffer[4096];
+//         auto [n, ec] = co_await socket.AsyncRead(::asio::buffer(buffer, 4096));
+//         if (n > 0) {
+//           SNOVA_INFO("Recv:{}", std::string_view(buffer, n));
+//         }
+//       },
+//       ::asio::detached);
+//   ctx.run();
+// }

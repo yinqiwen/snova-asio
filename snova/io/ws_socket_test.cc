@@ -28,6 +28,8 @@
  */
 #include "snova/io/ws_socket.h"
 #include <gtest/gtest.h>
+#include <memory>
+#include <string>
 #include <utility>
 #include "snova/io/tcp_socket.h"
 #include "snova/log/log_macros.h"
@@ -61,7 +63,7 @@ TEST(WebSocket, Simple) {
           if (n > 0) {
             SNOVA_INFO("Recv:{}", std::string_view(buffer, n));
           }
-          sleep(3);
+          // sleep(3);
           i++;
         }
       },

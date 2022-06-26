@@ -34,8 +34,8 @@
 namespace snova {
 class TcpSocket : public IOConnection {
  public:
-  TcpSocket(::asio::ip::tcp::socket& sock);
-  TcpSocket(::asio::ip::tcp::socket&& sock);
+  explicit TcpSocket(::asio::ip::tcp::socket& sock);
+  explicit TcpSocket(::asio::ip::tcp::socket&& sock);
 
   asio::any_io_executor GetExecutor() override;
   asio::awaitable<IOResult> AsyncWrite(const asio::const_buffer& buffers) override;

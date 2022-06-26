@@ -28,7 +28,8 @@
  */
 
 #include "snova/io/ws_socket.h"
-
+#include <string>
+#include <utility>
 #include "absl/strings/escaping.h"
 
 #include "asio/experimental/as_tuple.hpp"
@@ -112,12 +113,12 @@ asio::awaitable<IOResult> WebSocket::AsyncWrite(const asio::const_buffer& buffer
     head_buffer_data[1] = (data_len & 0x7F);
   } else if (data_len > 65535) {
     head_buffer_data[1] = 127;
-    uint64_t frame_len = native_to_big(data_len);
+    uint64_t frame_len = native_to_big(static_cast<uint64_t>(data_len));
     memcpy(head_buffer_data + 2, &frame_len, 8);
     offset += 8;
   } else {
     head_buffer_data[1] = 126;
-    uint16_t frame_len = native_to_big(data_len);
+    uint16_t frame_len = native_to_big(static_cast<uint16_t>(data_len));
     memcpy(head_buffer_data + 2, &frame_len, 2);
     offset += 2;
   }

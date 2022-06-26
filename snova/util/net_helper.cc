@@ -91,16 +91,13 @@ int get_orig_dst(int fd, ::asio::ip::tcp::endpoint* endpoint) {
 asio::awaitable<SocketPtr> get_connected_socket(const std::string& host, uint16_t port,
                                                 bool is_tcp) {
   auto ex = co_await asio::this_coro::executor;
-  asio::ip::tcp::resolver r(ex);
-  std::string port_str = std::to_string(port);
-  auto [ec, results] = co_await r.async_resolve(
-      host, port_str, ::asio::experimental::as_tuple(::asio::use_awaitable));
-  if (ec || results.size() == 0) {
-    SNOVA_ERROR("No endpoint found for {}:{} with error:{}", host, port_str, ec);
+  ::asio::ip::tcp::endpoint select_endpoint;
+  auto resolve_ec = co_await resolve_endpoint(host, port, &select_endpoint);
+  if (resolve_ec) {
+    SNOVA_ERROR("No endpoint found for {}:{} with error:{}", host, port, resolve_ec);
     co_return nullptr;
   }
   SocketPtr socket = std::make_unique<::asio::ip::tcp::socket>(ex);
-  ::asio::ip::tcp::endpoint select_endpoint = *(results.begin());
   auto [connect_ec] = co_await socket->async_connect(
       select_endpoint, ::asio::experimental::as_tuple(::asio::use_awaitable));
   if (connect_ec) {

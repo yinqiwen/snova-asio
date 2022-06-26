@@ -28,12 +28,13 @@
  */
 
 #pragma once
+#include <string>
 #include "asio.hpp"
 #include "snova/io/io.h"
 namespace snova {
 class WebSocket : public IOConnection {
  public:
-  WebSocket(IOConnectionPtr&& io);
+  explicit WebSocket(IOConnectionPtr&& io);
   asio::any_io_executor GetExecutor() override;
   asio::awaitable<std::error_code> AsyncConnect(const std::string& host);
   asio::awaitable<std::error_code> AsyncAccept();
