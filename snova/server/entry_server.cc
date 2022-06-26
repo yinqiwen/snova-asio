@@ -39,10 +39,10 @@
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/log/log_macros.h"
 #include "snova/server/relay.h"
+#include "snova/util/address.h"
 #include "snova/util/flags.h"
 #include "snova/util/net_helper.h"
 #include "snova/util/stat.h"
-#include "spdlog/fmt/bundled/ostream.h"
 
 namespace snova {
 static uint32_t g_local_proxy_conn_num = 0;
@@ -151,10 +151,12 @@ static ::asio::awaitable<void> server_loop(::asio::ip::tcp::acceptor server) {
 }
 
 asio::awaitable<std::error_code> start_entry_server(const std::string& addr) {
-  PaserEndpointResult parse_result = parse_endpoint(addr);
+  PaserAddressResult parse_result = NetAddress::Parse(addr);
   if (parse_result.second) {
     co_return parse_result.second;
   }
+  auto server_address = std::move(parse_result.first);
+
   register_stat_func([]() -> StatValues {
     StatValues vals;
     auto& kv = vals["LocalServer"];
@@ -163,7 +165,11 @@ asio::awaitable<std::error_code> start_entry_server(const std::string& addr) {
   });
 
   auto ex = co_await asio::this_coro::executor;
-  ::asio::ip::tcp::endpoint& endpoint = *parse_result.first;
+  ::asio::ip::tcp::endpoint endpoint;
+  auto resolve_ec = co_await server_address->GetEndpoint(&endpoint);
+  if (resolve_ec) {
+    co_return resolve_ec;
+  }
   ::asio::ip::tcp::acceptor acceptor(ex);
   acceptor.open(endpoint.protocol());
   acceptor.set_option(::asio::socket_base::reuse_address(true));

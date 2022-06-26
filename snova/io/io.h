@@ -53,6 +53,15 @@ using IOBufPtr = std::unique_ptr<IOBuf, IOBufDeleter>;
 IOBufPtr get_iobuf(size_t n);
 IOBufSharedPtr get_shared_iobuf(size_t n);
 
+struct IOConnection {
+  virtual asio::any_io_executor GetExecutor() = 0;
+  virtual asio::awaitable<IOResult> AsyncWrite(const asio::const_buffer& buffers) = 0;
+  virtual asio::awaitable<IOResult> AsyncRead(const asio::mutable_buffer& buffers) = 0;
+  virtual void Close() = 0;
+  virtual ~IOConnection() = default;
+};
+using IOConnectionPtr = std::unique_ptr<IOConnection>;
+
 using StreamReadResult = std::tuple<IOBufPtr, size_t, std::error_code>;
 struct Stream {
   virtual uint32_t GetID() const = 0;

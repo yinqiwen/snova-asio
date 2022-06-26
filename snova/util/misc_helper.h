@@ -29,6 +29,10 @@
 
 #pragma once
 #include <cstdint>
+#include <string>
 namespace snova {
 uint64_t random_uint64(uint64_t min, uint64_t max);
-}
+
+void sha1_sum(const std::string& src, std::string& dst);
+
+}  // namespace snova

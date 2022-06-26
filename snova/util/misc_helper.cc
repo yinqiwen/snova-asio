@@ -28,6 +28,7 @@
  */
 #include "snova/util/misc_helper.h"
 #include <random>
+#include "mbedtls/sha1.h"
 
 namespace snova {
 uint64_t random_uint64(uint64_t min, uint64_t max) {
@@ -39,5 +40,16 @@ uint64_t random_uint64(uint64_t min, uint64_t max) {
   // or what have you.
   std::uniform_int_distribution<uint64_t> distr(min, max);
   return distr(eng);
+}
+
+void sha1_sum(const std::string& src, std::string& dst) {
+  mbedtls_sha1_context ctx;
+  mbedtls_sha1_init(&ctx);
+  mbedtls_sha1_starts(&ctx);
+  mbedtls_sha1_update(&ctx, reinterpret_cast<const unsigned char*>(src.data()), src.size());
+  unsigned char output[20];
+  mbedtls_sha1_finish(&ctx, output);
+  mbedtls_sha1_free(&ctx);
+  dst.append(reinterpret_cast<const char*>(output), 20);
 }
 }  // namespace snova

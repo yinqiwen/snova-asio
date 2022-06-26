@@ -26,41 +26,25 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "snova/util/http_helper.h"
-#include "absl/strings/escaping.h"
-#include "absl/strings/str_split.h"
-#include "snova/util/misc_helper.h"
 
+#pragma once
+#include <memory>
+#include "asio.hpp"
+#include "snova/io/io.h"
 namespace snova {
-int parse_http_hostport(absl::string_view recv_data, absl::string_view* hostport) {
-  return http_get_header(recv_data, "Host:", hostport);
-}
-int http_get_header(absl::string_view recv_data, absl::string_view header, absl::string_view* val) {
-  auto pos = recv_data.find(header);
-  if (pos == absl::string_view::npos) {
-    return -1;
-  }
-  absl::string_view crlf = "\r\n";
-  auto end_pos = recv_data.find(crlf, pos);
-  if (end_pos == absl::string_view::npos) {
-    return -1;
-  }
-  size_t n = (end_pos - pos - header.size());
+class TcpSocket : public IOConnection {
+ public:
+  TcpSocket(::asio::ip::tcp::socket& sock);
+  TcpSocket(::asio::ip::tcp::socket&& sock);
 
-  absl::string_view tmp(recv_data.data() + pos + header.size(), n);
+  asio::any_io_executor GetExecutor() override;
+  asio::awaitable<IOResult> AsyncWrite(const asio::const_buffer& buffers) override;
+  asio::awaitable<IOResult> AsyncRead(const asio::mutable_buffer& buffers) override;
+  void Close() override;
 
-  *val = absl::StripAsciiWhitespace(tmp);
-  // printf("#### n:%d %d  %s\n", n, val->size(), tmp.data());
-  return 0;
-}
-
-void ws_get_accept_secret_key(absl::string_view key, std::string* accept_key) {
-  std::string encode_key(key.data(), key.size());
-  encode_key.append("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
-  std::string resp_bin_key;
-  sha1_sum(encode_key, resp_bin_key);
-  std::string resp_text_key;
-  absl::Base64Escape(resp_bin_key, accept_key);
-}
+ private:
+  std::unique_ptr<::asio::ip::tcp::socket> own_socket_;
+  ::asio::ip::tcp::socket& socket_;
+};
 
 }  // namespace snova

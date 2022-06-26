@@ -56,10 +56,10 @@ static uint32_t g_mux_conn_num = 0;
 static uint32_t g_mux_conn_num_in_loop = 0;
 size_t MuxConnection::Size() { return g_mux_conn_num; }
 size_t MuxConnection::ActiveSize() { return g_mux_conn_num_in_loop; }
-MuxConnection::MuxConnection(::asio::ip::tcp::socket&& sock,
-                             std::unique_ptr<CipherContext>&& cipher_ctx, bool is_local)
-    : socket_(std::move(sock)),
-      write_mutex_(socket_.get_executor()),
+MuxConnection::MuxConnection(IOConnectionPtr&& conn, std::unique_ptr<CipherContext>&& cipher_ctx,
+                             bool is_local)
+    : io_conn_(std::move(conn)),
+      write_mutex_(io_conn_->GetExecutor()),
       cipher_ctx_(std::move(cipher_ctx)),
       client_id_(0),
       idx_(0),
@@ -220,9 +220,8 @@ asio::awaitable<int> MuxConnection::ReadEvent(std::unique_ptr<MuxEvent>& event) 
     }
     size_t read_pos = current_read_buffer.size();
     // SNOVA_INFO("start read {} {}.", read_pos, read_buffer_.size() - read_pos);
-    auto [ec, n] = co_await socket_.async_read_some(
-        ::asio::buffer(read_buffer_.data() + read_pos, read_buffer_.size() - read_pos),
-        ::asio::experimental::as_tuple(::asio::use_awaitable));
+    auto [n, ec] = co_await io_conn_->AsyncRead(
+        ::asio::buffer(read_buffer_.data() + read_pos, read_buffer_.size() - read_pos));
     if (ec) {
       SNOVA_ERROR("Failed to read event with error:{}", ec);
       rc = ec.value();
@@ -266,7 +265,7 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
       StreamOpenRequest* open_request = dynamic_cast<StreamOpenRequest*>(event.get());
       if (nullptr == open_request) {
         SNOVA_ERROR("null request for EVENT_STREAM_OPEN");
-        co_return - 1;
+        co_return -1;
       }
       // SNOVA_INFO("[{}]Recv stream open with {}:{}, tcp:{}", event->head.sid,
       //            open_request->remote_host, open_request->remote_port, open_request->is_tcp);
@@ -306,7 +305,7 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
         StreamChunk* chunk = dynamic_cast<StreamChunk*>(event.get());
         if (nullptr == chunk) {
           SNOVA_ERROR("null chunk for EVENT_STREAM_CHUNK");
-          co_return - 1;
+          co_return -1;
         }
         read_state_ = STATE_OFFER_CHUNK;
         co_await stream->Offer(std::move(chunk->chunk), chunk->chunk_len);
@@ -337,7 +336,7 @@ asio::awaitable<void> MuxConnection::ReadEventLoop() {
 }
 
 void MuxConnection::Close() {
-  socket_.close();
+  io_conn_->Close();
   write_mutex_.Close();
 }
 
@@ -365,9 +364,7 @@ asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev)
   //       co_return;
   //     },
   //     g_tcp_write_timeout_secs);
-  auto [ec, n] =
-      co_await ::asio::async_write(socket_, ::asio::buffer(wbuffer.data(), wbuffer.size()),
-                                   ::asio::experimental::as_tuple(::asio::use_awaitable));
+  auto [n, ec] = co_await io_conn_->AsyncWrite(::asio::buffer(wbuffer.data(), wbuffer.size()));
   // cancel_write_timeout();
   co_await write_mutex_.Unlock();
   // co_await write_mutex_.unlock();

@@ -33,4 +33,7 @@
 
 namespace snova {
 int parse_http_hostport(absl::string_view recv_data, absl::string_view* hostport);
-}
+int http_get_header(absl::string_view recv_data, absl::string_view header, absl::string_view* val);
+
+void ws_get_accept_secret_key(absl::string_view key, std::string* accept_key);
+}  // namespace snova

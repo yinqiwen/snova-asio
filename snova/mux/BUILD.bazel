@@ -21,7 +21,11 @@ cc_library(
     deps = [
         ":mux_conn_manager",
         "//snova/io",
+        "//snova/io:tcp_socket",
+        "//snova/io:tls_socket",
+        "//snova/io:ws_socket",
         "//snova/log:log_api",
+        "//snova/util:address",
         "//snova/util:flags",
         "//snova/util:net_helper",
         "//snova/util:stat",

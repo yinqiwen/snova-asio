@@ -1,5 +1,5 @@
 /*
- *Copyright (c) 2022, yinqiwen <yinqiwen@gmail.com>
+ *Copyright (c) 2022, qiyingwang <qiyingwang@tencent.com>
  *All rights reserved.
  *
  *Redistribution and use in source and binary forms, with or without
@@ -26,39 +26,51 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "snova/io/read_until.h"
-#include "snova/io/tcp_socket.h"
+#include "snova/io/tls_socket.h"
+#include <gtest/gtest.h>
+#include <utility>
 #include "snova/log/log_macros.h"
+#include "snova/util/net_helper.h"
+using namespace snova;  // NOLINT
 
-namespace snova {
-asio::awaitable<int> read_until(IOConnection& socket, IOBufRef buf, size_t& readed_len,
-                                std::string_view until) {
-  int rc = 0;
-  while (true) {
-    std::string_view readed_view((const char*)buf.data(), readed_len);
-    auto pos = readed_view.find(until);
-    if (pos != std::string_view::npos) {
-      co_return pos;
-    }
-    size_t rest = buf.size() - readed_len;
-    if (rest < until.size()) {
-      buf.resize(buf.size() * 2);
-    }
-    auto [n, ec] =
-        co_await socket.AsyncRead(::asio::buffer(buf.data() + readed_len, buf.size() - readed_len));
-    if (n > 0) {
-      readed_len += n;
-    } else {
-      SNOVA_ERROR("read socket error:{} with n:{}", ec, n);
-      rc = -1;
-      break;
-    }
-  }
-  co_return rc;
+TEST(TlsSocket, Simple) {
+  ::asio::io_context ctx;
+  TlsSocket socket(ctx.get_executor());
+
+  ::asio::co_spawn(
+      ctx,
+      [socket = std::move(socket)]() mutable -> asio::awaitable<void> {
+        co_await socket.AsyncConnect("www.baidu.com", 443);
+        std::string req = "GET / HTTP/1.0\r\n\r\n";
+        co_await socket.AsyncWrite(::asio::buffer(req.data(), req.size()));
+        char buffer[4096];
+        auto [n, ec] = co_await socket.AsyncRead(::asio::buffer(buffer, 4096));
+        if (n > 0) {
+          SNOVA_INFO("Recv:{}", std::string_view(buffer, n));
+        }
+      },
+      ::asio::detached);
+  ctx.run();
 }
-asio::awaitable<int> read_until(SocketRef socket, IOBufRef buf, size_t& readed_len,
-                                std::string_view until) {
-  TcpSocket tcp(socket);
-  co_return co_await read_until(tcp, buf, readed_len, until);
+
+TEST(TlsSocket, Simple2) {
+  ::asio::io_context ctx;
+
+  ::asio::co_spawn(
+      ctx,
+      []() mutable -> asio::awaitable<void> {
+        auto ex = co_await asio::this_coro::executor;
+        ::asio::ip::tcp::socket sock(ex);
+        TlsSocket socket(std::move(sock));
+        co_await socket.AsyncConnect("www.baidu.com", 443);
+        std::string req = "GET / HTTP/1.0\r\n\r\n";
+        co_await socket.AsyncWrite(::asio::buffer(req.data(), req.size()));
+        char buffer[4096];
+        auto [n, ec] = co_await socket.AsyncRead(::asio::buffer(buffer, 4096));
+        if (n > 0) {
+          SNOVA_INFO("Recv:{}", std::string_view(buffer, n));
+        }
+      },
+      ::asio::detached);
+  ctx.run();
 }
-}  // namespace snova

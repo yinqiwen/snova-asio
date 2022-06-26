@@ -26,41 +26,25 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "snova/util/http_helper.h"
-#include "absl/strings/escaping.h"
-#include "absl/strings/str_split.h"
-#include "snova/util/misc_helper.h"
+#include "snova/io/tcp_socket.h"
+
+#include "asio/experimental/as_tuple.hpp"
 
 namespace snova {
-int parse_http_hostport(absl::string_view recv_data, absl::string_view* hostport) {
-  return http_get_header(recv_data, "Host:", hostport);
+TcpSocket::TcpSocket(::asio::ip::tcp::socket& sock) : socket_(sock) {}
+TcpSocket::TcpSocket(::asio::ip::tcp::socket&& sock)
+    : own_socket_{std::make_unique<::asio::ip::tcp::socket>(std::move(sock))},
+      socket_(*own_socket_) {}
+asio::any_io_executor TcpSocket::GetExecutor() { return socket_.get_executor(); }
+asio::awaitable<IOResult> TcpSocket::AsyncWrite(const asio::const_buffer& buffers) {
+  auto [ec, n] = co_await ::asio::async_write(
+      socket_, buffers, ::asio::experimental::as_tuple(::asio::use_awaitable));
+  co_return IOResult{n, ec};
 }
-int http_get_header(absl::string_view recv_data, absl::string_view header, absl::string_view* val) {
-  auto pos = recv_data.find(header);
-  if (pos == absl::string_view::npos) {
-    return -1;
-  }
-  absl::string_view crlf = "\r\n";
-  auto end_pos = recv_data.find(crlf, pos);
-  if (end_pos == absl::string_view::npos) {
-    return -1;
-  }
-  size_t n = (end_pos - pos - header.size());
-
-  absl::string_view tmp(recv_data.data() + pos + header.size(), n);
-
-  *val = absl::StripAsciiWhitespace(tmp);
-  // printf("#### n:%d %d  %s\n", n, val->size(), tmp.data());
-  return 0;
+asio::awaitable<IOResult> TcpSocket::AsyncRead(const asio::mutable_buffer& buffers) {
+  auto [ec, n] = co_await socket_.async_read_some(
+      buffers, ::asio::experimental::as_tuple(::asio::use_awaitable));
+  co_return IOResult{n, ec};
 }
-
-void ws_get_accept_secret_key(absl::string_view key, std::string* accept_key) {
-  std::string encode_key(key.data(), key.size());
-  encode_key.append("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
-  std::string resp_bin_key;
-  sha1_sum(encode_key, resp_bin_key);
-  std::string resp_text_key;
-  absl::Base64Escape(resp_bin_key, accept_key);
-}
-
+void TcpSocket::Close() { socket_.close(); }
 }  // namespace snova

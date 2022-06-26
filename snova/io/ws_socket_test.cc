@@ -1,5 +1,5 @@
 /*
- *Copyright (c) 2022, yinqiwen <yinqiwen@gmail.com>
+ *Copyright (c) 2022, qiyingwang <qiyingwang@tencent.com>
  *All rights reserved.
  *
  *Redistribution and use in source and binary forms, with or without
@@ -26,39 +26,45 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#pragma once
-#include <memory>
-#include <string>
-#include <vector>
-
-#include "asio.hpp"
-#include "snova/mux/mux_conn_manager.h"
+#include "snova/io/ws_socket.h"
+#include <gtest/gtest.h>
+#include <utility>
+#include "snova/io/tcp_socket.h"
+#include "snova/log/log_macros.h"
 #include "snova/util/address.h"
-#include "snova/util/stat.h"
-namespace snova {
-class MuxClient {
- public:
-  static std::shared_ptr<MuxClient>& GetInstance();
-  EventWriterFactory GetEventWriterFactory();
-  void SetClientId(uint64_t client_id);
-  uint64_t GetClientId() const { return client_id_; }
-  asio::awaitable<std::error_code> Init(const std::string& user, const std::string& cipher_method,
-                                        const std::string& cipher_key);
+#include "snova/util/net_helper.h"
+using namespace snova;  // NOLINT
 
- private:
-  asio::awaitable<std::error_code> NewConnection(uint32_t idx);
-  asio::awaitable<void> CheckConnections();
+TEST(WebSocket, Simple) {
+  ::asio::io_context ctx;
+  ::asio::ip::tcp::socket socket(ctx);
+  PaserAddressResult parse_result = NetAddress::Parse("127.0.0.1:8080");
+  auto remote_addr = std::move(parse_result.first);
+  ::asio::co_spawn(
+      ctx,
+      [socket = std::move(socket),
+       remote_addr = std::move(remote_addr)]() mutable -> asio::awaitable<void> {
+        ::asio::ip::tcp::endpoint remote_endpoint;
+        co_await remote_addr->GetEndpoint(&remote_endpoint);
+        co_await socket.async_connect(remote_endpoint, ::asio::use_awaitable);
+        IOConnectionPtr io = std::make_unique<TcpSocket>(std::move(socket));
+        WebSocket ws(std::move(io));
+        auto ec = co_await ws.AsyncConnect("localhost:8080");
 
-  MuxSessionPtr remote_session_;
-  // std::vector<MuxConnectionPtr> remote_conns_;
-  std::unique_ptr<NetAddress> remote_mux_address_;
-  // ::asio::ip::tcp::endpoint remote_endpoint_;
-  std::string auth_user_;
-  std::string cipher_method_;
-  std::string cipher_key_;
-  // uint32_t select_cursor_ = 0;
-  uint64_t client_id_ = 0;
-};
-
-}  // namespace snova
+        size_t i = 0;
+        while (true) {
+          std::string s = "hello,world!";
+          s.append(std::to_string(i));
+          co_await ws.AsyncWrite(::asio::buffer(s.data(), s.size()));
+          char buffer[1024];
+          auto [n, ec] = co_await ws.AsyncRead(::asio::buffer(buffer, 1024));
+          if (n > 0) {
+            SNOVA_INFO("Recv:{}", std::string_view(buffer, n));
+          }
+          sleep(3);
+          i++;
+        }
+      },
+      ::asio::detached);
+  ctx.run();
+}

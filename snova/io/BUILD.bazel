@@ -3,6 +3,7 @@ load(
     "SNOVA_DEFAULT_COPTS",
     "SNOVA_DEFAULT_LINKOPTS",
 )
+load("@rules_cc//cc:defs.bzl", "cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -19,6 +20,75 @@ cc_library(
         "//snova/util:stat",
         "@asio",
         "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
+    name = "tls_socket",
+    srcs = ["tls_socket.cc"],
+    hdrs = ["tls_socket.h"],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        ":io",
+        "//snova/log:log_api",
+        "//snova/util:net_helper",
+        "@com_github_google_borringssl//:ssl",
+    ],
+)
+
+cc_test(
+    name = "tls_socket_test",
+    srcs = ["tls_socket_test.cc"],
+    copts = SNOVA_DEFAULT_COPTS,
+    linkopts = SNOVA_DEFAULT_LINKOPTS,
+    deps = [
+        ":tls_socket",
+        "//snova/log:log_api",
+        "//snova/util:http_helper",
+        "//snova/util:net_helper",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "tcp_socket",
+    srcs = ["tcp_socket.cc"],
+    hdrs = ["tcp_socket.h"],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        ":io",
+        "//snova/log:log_api",
+    ],
+)
+
+cc_library(
+    name = "ws_socket",
+    srcs = ["ws_socket.cc"],
+    hdrs = ["ws_socket.h"],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        ":io",
+        "//snova/log:log_api",
+        "//snova/util:address",
+        "//snova/util:endian",
+        "//snova/util:http_helper",
+        "//snova/util:misc_helper",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_test(
+    name = "ws_socket_test",
+    srcs = ["ws_socket_test.cc"],
+    copts = SNOVA_DEFAULT_COPTS,
+    linkopts = SNOVA_DEFAULT_LINKOPTS,
+    deps = [
+        ":tcp_socket",
+        ":ws_socket",
+        "//snova/log:log_api",
+        "//snova/util:http_helper",
+        "//snova/util:net_helper",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -40,6 +110,7 @@ cc_library(
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
         ":io",
+        ":tcp_socket",
         "//snova/log:log_api",
     ],
 )

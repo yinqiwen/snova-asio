@@ -36,4 +36,5 @@ namespace snova {
 asio::awaitable<std::error_code> start_mux_server(const std::string& addr,
                                                   const std::string& cipher_method,
                                                   const std::string& cipher_key);
-}
+
+}  // namespace snova

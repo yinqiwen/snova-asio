@@ -42,25 +42,6 @@
 #include "spdlog/fmt/fmt.h"
 
 namespace snova {
-PaserEndpointResult parse_endpoint(const std::string& addr) {
-  std::vector<absl::string_view> host_ports = absl::StrSplit(addr, ':');
-  if (host_ports.size() != 2) {
-    return PaserEndpointResult{nullptr, std::make_error_code(std::errc::invalid_argument)};
-  }
-  int port = -1;
-  try {
-    port = std::stoi(std::string(host_ports[1]));
-  } catch (...) {
-    return PaserEndpointResult{nullptr, std::make_error_code(std::errc::invalid_argument)};
-  }
-  absl::string_view host_view = host_ports[0];
-  if (host_view.empty()) {
-    host_view = "0.0.0.0";
-  }
-  auto endpoint =
-      std::make_unique<::asio::ip::tcp::endpoint>(::asio::ip::make_address(host_view), port);
-  return PaserEndpointResult{std::move(endpoint), std::error_code{}};
-}
 
 static std::array<::asio::ip::address_v4_range, 3> g_private_networks = {
     ::asio::ip::make_network_v4("10.0.0.0/8").hosts(),
@@ -129,23 +110,35 @@ asio::awaitable<SocketPtr> get_connected_socket(const std::string& host, uint16_
   co_return socket;
 }
 
-asio::awaitable<std::error_code> connect_remote_via_http_proxy(
-    SocketRef socket, const ::asio::ip::tcp::endpoint& remote, const std::string& proxy_host,
-    uint32_t proxy_port) {
+asio::awaitable<std::error_code> resolve_endpoint(const std::string& host, uint16_t port,
+                                                  ::asio::ip::tcp::endpoint* endpoint) {
   auto ex = co_await asio::this_coro::executor;
   asio::ip::tcp::resolver r(ex);
-  std::string port_str = std::to_string(proxy_port);
+  std::string port_str = std::to_string(port);
   auto [ec, results] = co_await r.async_resolve(
-      proxy_host, port_str, ::asio::experimental::as_tuple(::asio::use_awaitable));
+      host, port_str, ::asio::experimental::as_tuple(::asio::use_awaitable));
 
   if (ec || results.size() == 0) {
-    SNOVA_ERROR("No endpoint found for {}:{} with error:{}", proxy_host, port_str, ec);
+    SNOVA_ERROR("No endpoint found for {}:{} with error:{}", host, port_str, ec);
     if (ec) {
       co_return ec;
     }
     co_return std::make_error_code(std::errc::bad_address);
   }
-  ::asio::ip::tcp::endpoint proxy_endpoint = *(results.begin());
+  *endpoint = *(results.begin());
+  co_return std::error_code{};
+}
+
+asio::awaitable<std::error_code> connect_remote_via_http_proxy(SocketRef socket,
+                                                               const std::string& remote_host,
+                                                               uint16_t remote_port,
+                                                               const std::string& proxy_host,
+                                                               uint16_t proxy_port) {
+  ::asio::ip::tcp::endpoint proxy_endpoint;
+  auto ec = co_await resolve_endpoint(proxy_host, proxy_port, &proxy_endpoint);
+  if (ec) {
+    co_return ec;
+  }
   auto [connect_ec] = co_await socket.async_connect(
       proxy_endpoint, ::asio::experimental::as_tuple(::asio::use_awaitable));
   if (connect_ec) {
@@ -156,7 +149,7 @@ asio::awaitable<std::error_code> connect_remote_via_http_proxy(
   std::string conn_req = fmt::format(
       "CONNECT {}:{} HTTP/1.1\r\nHost: {}:{}\r\nConnection: keep-alive\r\nProxy-Connection: "
       "keep-alive\r\n\r\n",
-      remote.address().to_string(), remote.port(), remote.address().to_string(), remote.port());
+      remote_host, remote_port, remote_host, remote_port);
   auto [wec, wn] =
       co_await ::asio::async_write(socket, ::asio::buffer(conn_req.data(), conn_req.size()),
                                    ::asio::experimental::as_tuple(::asio::use_awaitable));
