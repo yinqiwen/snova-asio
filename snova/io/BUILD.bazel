@@ -24,6 +24,18 @@ cc_library(
 )
 
 cc_library(
+    name = "buffered_io",
+    srcs = ["buffered_io.cc"],
+    hdrs = ["buffered_io.h"],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        ":io",
+        "//snova/log:log_api",
+        "@com_github_google_borringssl//:ssl",
+    ],
+)
+
+cc_library(
     name = "tls_socket",
     srcs = ["tls_socket.cc"],
     hdrs = ["tls_socket.h"],
@@ -67,7 +79,9 @@ cc_library(
     hdrs = ["ws_socket.h"],
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
+        ":buffered_io",
         ":io",
+        ":io_util",
         "//snova/log:log_api",
         "//snova/util:address",
         "//snova/util:endian",
@@ -104,9 +118,9 @@ cc_library(
 )
 
 cc_library(
-    name = "read_until",
-    srcs = ["read_until.cc"],
-    hdrs = ["read_until.h"],
+    name = "io_util",
+    srcs = ["io_util.cc"],
+    hdrs = ["io_util.h"],
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
         ":io",

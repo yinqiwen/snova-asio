@@ -42,6 +42,11 @@ asio::awaitable<IOResult> TcpSocket::AsyncWrite(const asio::const_buffer& buffer
       socket_, buffers, ::asio::experimental::as_tuple(::asio::use_awaitable));
   co_return IOResult{n, ec};
 }
+asio::awaitable<IOResult> TcpSocket::AsyncWrite(const std::vector<::asio::const_buffer>& buffers) {
+  auto [ec, n] = co_await ::asio::async_write(
+      socket_, buffers, ::asio::experimental::as_tuple(::asio::use_awaitable));
+  co_return IOResult{n, ec};
+}
 asio::awaitable<IOResult> TcpSocket::AsyncRead(const asio::mutable_buffer& buffers) {
   auto [ec, n] = co_await socket_.async_read_some(
       buffers, ::asio::experimental::as_tuple(::asio::use_awaitable));

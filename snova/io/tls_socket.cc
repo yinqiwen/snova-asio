@@ -63,6 +63,11 @@ asio::awaitable<IOResult> TlsSocket::AsyncWrite(const asio::const_buffer& buffer
       tls_socket_, buffers, ::asio::experimental::as_tuple(::asio::use_awaitable));
   co_return IOResult{n, ec};
 }
+asio::awaitable<IOResult> TlsSocket::AsyncWrite(const std::vector<::asio::const_buffer>& buffers) {
+  auto [ec, n] = co_await ::asio::async_write(
+      tls_socket_, buffers, ::asio::experimental::as_tuple(::asio::use_awaitable));
+  co_return IOResult{n, ec};
+}
 asio::awaitable<IOResult> TlsSocket::AsyncRead(const asio::mutable_buffer& buffers) {
   auto [ec, n] = co_await tls_socket_.async_read_some(
       buffers, ::asio::experimental::as_tuple(::asio::use_awaitable));

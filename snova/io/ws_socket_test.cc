@@ -41,6 +41,10 @@ TEST(WebSocket, Simple) {
   ::asio::io_context ctx;
   ::asio::ip::tcp::socket socket(ctx);
   PaserAddressResult parse_result = NetAddress::Parse("127.0.0.1:8080");
+  if (parse_result.second) {
+    SNOVA_INFO("Parse failed:{}", parse_result.second);
+    return;
+  }
   auto remote_addr = std::move(parse_result.first);
   ::asio::co_spawn(
       ctx,
@@ -48,22 +52,24 @@ TEST(WebSocket, Simple) {
        remote_addr = std::move(remote_addr)]() mutable -> asio::awaitable<void> {
         ::asio::ip::tcp::endpoint remote_endpoint;
         co_await remote_addr->GetEndpoint(&remote_endpoint);
+        SNOVA_INFO("endpoint:{}", remote_endpoint);
         co_await socket.async_connect(remote_endpoint, ::asio::use_awaitable);
+
         IOConnectionPtr io = std::make_unique<TcpSocket>(std::move(socket));
         WebSocket ws(std::move(io));
         auto ec = co_await ws.AsyncConnect("localhost:8080");
-
         size_t i = 0;
         while (true) {
           std::string s = "hello,world!";
           s.append(std::to_string(i));
+          // SNOVA_INFO("Try send:{}", s.size());
           co_await ws.AsyncWrite(::asio::buffer(s.data(), s.size()));
+          s.clear();
           char buffer[1024];
           auto [n, ec] = co_await ws.AsyncRead(::asio::buffer(buffer, 1024));
           if (n > 0) {
-            SNOVA_INFO("Recv:{}", std::string_view(buffer, n));
+            // SNOVA_INFO("[{}]Recv:{}", n, std::string_view(buffer, n));
           }
-          // sleep(3);
           i++;
         }
       },

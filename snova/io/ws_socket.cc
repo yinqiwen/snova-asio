@@ -34,16 +34,15 @@
 
 #include "asio/experimental/as_tuple.hpp"
 
+#include "snova/io/buffered_io.h"
+#include "snova/io/io_util.h"
 #include "snova/log/log_macros.h"
 #include "snova/util/endian.h"
 #include "snova/util/http_helper.h"
 #include "snova/util/misc_helper.h"
 
 namespace snova {
-WebSocket::WebSocket(IOConnectionPtr&& io) : io_(std::move(io)) {
-  recv_buffer_ = get_iobuf(kMaxChunkSize);
-  send_buffer_ = get_iobuf(kMaxChunkSize);
-}
+WebSocket::WebSocket(IOConnectionPtr&& io) { io_ = std::make_unique<BufferedIO>(std::move(io)); }
 asio::any_io_executor WebSocket::GetExecutor() { return io_->GetExecutor(); }
 asio::awaitable<std::error_code> WebSocket::AsyncConnect(const std::string& host) {
   std::string request = "GET /echo HTTP/1.1\r\n";
@@ -59,13 +58,14 @@ asio::awaitable<std::error_code> WebSocket::AsyncConnect(const std::string& host
   if (wec) {
     co_return wec;
   }
-  auto [n, ec] = co_await io_->AsyncRead(::asio::buffer(recv_buffer_->data(), kMaxChunkSize));
+  auto recv_buffer = get_iobuf(kMaxChunkSize);
+  auto [n, ec] = co_await io_->AsyncRead(::asio::buffer(recv_buffer->data(), kMaxChunkSize));
   if (ec) {
     co_return ec;
   }
   std::string accept_key;
   ws_get_accept_secret_key(ws_sec_key, &accept_key);
-  absl::string_view recv_response(reinterpret_cast<const char*>(recv_buffer_->data()), n);
+  absl::string_view recv_response(reinterpret_cast<const char*>(recv_buffer->data()), n);
   absl::string_view sec_ws_accept;
   int rc = http_get_header(recv_response, "Sec-WebSocket-Accept:", &sec_ws_accept);
   if (0 != rc) {
@@ -77,12 +77,13 @@ asio::awaitable<std::error_code> WebSocket::AsyncConnect(const std::string& host
   co_return std::error_code{};
 }
 asio::awaitable<std::error_code> WebSocket::AsyncAccept() {
-  auto [n, ec] = co_await io_->AsyncRead(::asio::buffer(recv_buffer_->data(), kMaxChunkSize));
+  auto recv_buffer = get_iobuf(kMaxChunkSize);
+  auto [n, ec] = co_await io_->AsyncRead(::asio::buffer(recv_buffer->data(), kMaxChunkSize));
   if (ec) {
     co_return ec;
   }
 
-  absl::string_view recv_request(reinterpret_cast<const char*>(recv_buffer_->data()), n);
+  absl::string_view recv_request(reinterpret_cast<const char*>(recv_buffer->data()), n);
   SNOVA_INFO("Recv {}", recv_request);
   absl::string_view sec_ws_key;
   int rc = http_get_header(recv_request, "Sec-WebSocket-Key:", &sec_ws_key);
@@ -104,9 +105,13 @@ asio::awaitable<std::error_code> WebSocket::AsyncAccept() {
   is_server_ = true;
   co_return std::error_code{};
 }
+asio::awaitable<IOResult> WebSocket::AsyncWrite(const std::vector<::asio::const_buffer>& buffers) {
+  co_return IOResult{0, std::error_code{}};
+}
 asio::awaitable<IOResult> WebSocket::AsyncWrite(const asio::const_buffer& buffers) {
-  uint8_t* head_buffer_data = send_buffer_->data();
+  uint8_t head_buffer_data[128];
   size_t data_len = buffers.size();
+  // SNOVA_INFO("##WS send {} bytes!", data_len);
   size_t offset = 2;
   head_buffer_data[0] = 0x82;  // binary msg
   if (data_len <= 125) {
@@ -127,113 +132,96 @@ asio::awaitable<IOResult> WebSocket::AsyncWrite(const asio::const_buffer& buffer
     uint8_t mask_key[4];  // random value
     memcpy(head_buffer_data + offset, mask_key, 4);
     offset += 4;
-    const uint8_t* send_data = reinterpret_cast<const uint8_t*>(buffers.data());
+    uint8_t* send_data = reinterpret_cast<uint8_t*>(const_cast<void*>(buffers.data()));
     for (size_t i = 0; i < data_len; i++) {
-      head_buffer_data[offset + i] = (send_data[i] ^ mask_key[i % 4]);
+      send_data[i] = (send_data[i] ^ mask_key[i % 4]);
     }
   } else {
-    memcpy(head_buffer_data + offset, buffers.data(), data_len);
+    // memcpy(head_buffer_data + offset, buffers.data(), data_len);
   }
-  offset += data_len;
-  // uint8_t byte0 = head_buffer_data[0];
-  // uint8_t frame_fin = (byte0 & 0x80);
-  // uint8_t frame_opcode = (byte0 & 0x0F);
-  // uint8_t byte1 = head_buffer_data[1];
-  // uint8_t frame_mask = (byte1 >> 7);
-  // uint8_t frame_payload_len = (byte1 & 0x7F);
-  // SNOVA_INFO("Send data opcode:{}, len:{},frame_opcode:{},frame_mask:{},data_msg_len:{} ",
-  //            frame_opcode, offset, frame_opcode, frame_mask, frame_payload_len);
-
-  auto [n, ec] = co_await io_->AsyncWrite(::asio::buffer(head_buffer_data, offset));
+  std::vector<::asio::const_buffer> send_bufs;
+  send_bufs.push_back(::asio::buffer(head_buffer_data, offset));
+  send_bufs.push_back(buffers);
+  auto [n, ec] = co_await io_->AsyncWrite(send_bufs);
   co_return IOResult{data_len, ec};
 }
-size_t WebSocket::ReadBuffer(const asio::mutable_buffer& buffers) {
-  if (recv_msg_.size() > 0) {
-    size_t len = recv_msg_.size();
-    if (buffers.size() < len) {
-      len = buffers.size();
-    }
-    memcpy(buffers.data(), recv_msg_.data(), len);
-    recv_msg_.remove_prefix(len);
-    return len;
-  }
-  return 0;
-}
+// size_t WebSocket::ReadBuffer(const asio::mutable_buffer& buffers) {
+//   if (recv_msg_.size() > 0) {
+//     size_t len = recv_msg_.size();
+//     if (buffers.size() < len) {
+//       len = buffers.size();
+//     }
+//     memcpy(buffers.data(), recv_msg_.data(), len);
+//     recv_msg_.remove_prefix(len);
+//     return len;
+//   }
+//   return 0;
+// }
 asio::awaitable<IOResult> WebSocket::AsyncRead(const asio::mutable_buffer& buffers) {
-  size_t n = ReadBuffer(buffers);
-  if (n > 0) {
-    co_return IOResult{n, std::error_code{}};
+  uint8_t header_bytes[2];
+  auto ec = co_await read_exact(*io_, ::asio::buffer(header_bytes, 2));
+  if (ec) {
+    co_return IOResult{0, ec};
   }
-  Bytes current_recv_msg;
-  size_t pos = 0;
-  uint8_t* recv_buffer_data = recv_buffer_->data();
-  size_t recv_buffer_size = kMaxChunkSize;
-  bool continue_read = true;
-  while (continue_read) {
-    auto [n, ec] =
-        co_await io_->AsyncRead(::asio::buffer(recv_buffer_data + pos, recv_buffer_size - pos));
-    if (ec || 0 == n) {
-      co_return IOResult{n, ec};
-    }
+  uint8_t byte0 = header_bytes[0];
+  uint8_t frame_fin = (byte0 & 0x1);
+  uint8_t frame_opcode = (byte0 & 0x0F);
+  uint8_t byte1 = header_bytes[1];
+  uint8_t frame_mask = (byte1 >> 7);
+  uint8_t frame_payload_len = (byte1 & 0x7F);
+  uint64_t data_msg_len = frame_payload_len;
+  if (frame_opcode != 0x2) {
+    // onlyu accept binary msg
+    // Close();
+    // co_return IOResult{0, std::error_code{}};
+    SNOVA_ERROR("Recv unexpected {}", frame_opcode);
+  }
 
-    size_t msg_len = pos + n;
-    pos += n;
-    absl::string_view recv_data(reinterpret_cast<const char*>(recv_buffer_data), msg_len);
-    uint8_t byte0 = recv_buffer_data[0];
-    uint8_t frame_fin = (byte0 & 0x1);
-    uint8_t frame_opcode = (byte0 & 0x0F);
-    uint8_t byte1 = recv_buffer_data[1];
-    uint8_t frame_mask = (byte1 >> 7);
-    uint8_t frame_payload_len = (byte1 & 0x7F);
-    uint64_t data_msg_len = frame_payload_len;
-    if (msg_len < 2) {
-      continue;
+  // SNOVA_INFO("Recv data opcode:{}, len:{},frame_opcode:{},frame_mask:{},data_msg_len:{} ",
+  //            frame_opcode, n, frame_opcode, frame_mask, data_msg_len);
+  if (frame_payload_len == 126) {
+    uint16_t data_len = 0;
+    ec = co_await read_exact(*io_, ::asio::buffer(reinterpret_cast<uint8_t*>(&data_len), 2));
+    if (ec) {
+      co_return IOResult{0, ec};
     }
+    data_len = big_to_native(data_len);
+    data_msg_len = data_len;
+  } else if (frame_payload_len == 127) {
+    uint64_t data_len = 0;
+    ec = co_await read_exact(*io_, ::asio::buffer(reinterpret_cast<uint8_t*>(&data_len), 8));
+    if (ec) {
+      co_return IOResult{0, ec};
+    }
+    data_len = big_to_native(data_len);
+    data_msg_len = data_len;
+  }
+  if (buffers.size() < data_msg_len) {
+    co_return IOResult{0, std::make_error_code(std::errc::no_buffer_space)};
+  }
+  // SNOVA_INFO("##WS recv {} bytes with mask:{}!", data_msg_len, frame_mask);
+
+  if (frame_mask == 1) {
     uint8_t mask_key[4];
-    size_t offset = 2;
-    // SNOVA_INFO("Recv data opcode:{}, len:{},frame_opcode:{},frame_mask:{},data_msg_len:{} ",
-    //            frame_opcode, n, frame_opcode, frame_mask, data_msg_len);
-    if (frame_payload_len == 126) {
-      if (msg_len < 4) {
-        continue;
-      }
-      uint16_t data_len = 0;
-      memcpy(&data_len, recv_buffer_data + offset, 2);
-      offset += 2;
-      data_len = big_to_native(data_len);
-      data_msg_len = data_len;
-    } else if (frame_payload_len == 127) {
-      if (msg_len < 10) {
-        continue;
-      }
-      uint64_t data_len = 0;
-      memcpy(&data_len, recv_buffer_data + offset, 8);
-      offset += 8;
-      data_len = big_to_native(data_len);
-      data_msg_len = data_len;
+    ec = co_await read_exact(*io_, ::asio::buffer(mask_key, 4));
+    if (ec) {
+      co_return IOResult{0, ec};
     }
-
-    if (frame_mask == 1) {
-      if (msg_len < (offset + 4 + data_msg_len)) {
-        continue;
-      }
-      memcpy(mask_key, recv_buffer_data + offset, 4);
-      offset += 4;
-      for (size_t i = 0; i < data_msg_len; i++) {
-        recv_buffer_data[offset + i] ^= mask_key[i % 4];
-      }
-    } else {
-      if (msg_len < (offset + data_msg_len)) {
-        continue;
-      }
+    ec = co_await read_exact(*io_, ::asio::buffer(buffers.data(), data_msg_len));
+    if (ec) {
+      co_return IOResult{0, ec};
     }
-    current_recv_msg = absl::MakeSpan(recv_buffer_data + offset, data_msg_len);
-    break;
+    uint8_t* buffer_bytes = reinterpret_cast<uint8_t*>(buffers.data());
+    for (size_t i = 0; i < data_msg_len; i++) {
+      buffer_bytes[i] ^= mask_key[i % 4];
+    }
+  } else {
+    ec = co_await read_exact(*io_, ::asio::buffer(buffers.data(), data_msg_len));
+    if (ec) {
+      co_return IOResult{0, ec};
+    }
   }
-
-  recv_msg_ = current_recv_msg;
-  n = ReadBuffer(buffers);
-  co_return IOResult{n, std::error_code{}};
+  co_return IOResult{data_msg_len, std::error_code{}};
 }
 void WebSocket::Close() { io_->Close(); }
 }  // namespace snova

@@ -39,6 +39,7 @@ class TcpSocket : public IOConnection {
 
   asio::any_io_executor GetExecutor() override;
   asio::awaitable<IOResult> AsyncWrite(const asio::const_buffer& buffers) override;
+  asio::awaitable<IOResult> AsyncWrite(const std::vector<::asio::const_buffer>& buffers) override;
   asio::awaitable<IOResult> AsyncRead(const asio::mutable_buffer& buffers) override;
   void Close() override;
 

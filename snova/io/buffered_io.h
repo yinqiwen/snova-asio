@@ -29,54 +29,24 @@
 
 #pragma once
 #include <memory>
-#include <tuple>
-#include <utility>
-#include <vector>
-#include "absl/types/span.h"
 #include "asio.hpp"
-#include "asio/experimental/awaitable_operators.hpp"
 #include "snova/io/io.h"
-
 namespace snova {
-using IOResult = std::pair<size_t, std::error_code>;
-using MutableBytes = absl::Span<uint8_t>;
-using Bytes = absl::Span<const uint8_t>;
-using IOBuf = std::vector<uint8_t>;
-static constexpr uint16_t kMaxChunkSize = 8192;
-static constexpr uint16_t kReservedBufferSize = 256;
-struct IOBufDeleter {
-  void operator()(IOBuf* v) const;
+class BufferedIO : public IOConnection {
+ public:
+  explicit BufferedIO(IOConnectionPtr&& io);
+
+  asio::any_io_executor GetExecutor() override;
+  asio::awaitable<IOResult> AsyncWrite(const asio::const_buffer& buffers) override;
+  asio::awaitable<IOResult> AsyncWrite(const std::vector<::asio::const_buffer>& buffers) override;
+  asio::awaitable<IOResult> AsyncRead(const asio::mutable_buffer& buffers) override;
+  void Close() override;
+
+ private:
+  IOBufPtr recv_buffer_;
+  IOConnectionPtr io_;
+  size_t offset_;
+  size_t length_;
 };
-using IOBufSharedPtr = std::shared_ptr<IOBuf>;
-using IOBufPtr = std::unique_ptr<IOBuf, IOBufDeleter>;
-
-IOBufPtr get_iobuf(size_t n);
-IOBufSharedPtr get_shared_iobuf(size_t n);
-
-struct IOConnection {
-  virtual asio::any_io_executor GetExecutor() = 0;
-  virtual asio::awaitable<IOResult> AsyncWrite(const asio::const_buffer& buffers) = 0;
-  virtual asio::awaitable<IOResult> AsyncWrite(
-      const std::vector<::asio::const_buffer>& buffers) = 0;
-
-  virtual asio::awaitable<IOResult> AsyncRead(const asio::mutable_buffer& buffers) = 0;
-  virtual void Close() = 0;
-  virtual ~IOConnection() = default;
-};
-using IOConnectionPtr = std::unique_ptr<IOConnection>;
-
-using StreamReadResult = std::tuple<IOBufPtr, size_t, std::error_code>;
-struct Stream {
-  virtual uint32_t GetID() const = 0;
-  virtual asio::awaitable<StreamReadResult> Read() = 0;
-  virtual asio::awaitable<std::error_code> Write(IOBufPtr&& buf, size_t len) = 0;
-  virtual asio::awaitable<std::error_code> Close(bool close_by_remote) = 0;
-  virtual ~Stream() = default;
-};
-using StreamPtr = std::shared_ptr<Stream>;
-using SocketRef = ::asio::ip::tcp::socket&;
-using IOBufRef = IOBuf&;
-
-void register_io_stat();
 
 }  // namespace snova

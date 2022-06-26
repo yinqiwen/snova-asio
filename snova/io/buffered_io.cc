@@ -26,25 +26,43 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include "snova/io/buffered_io.h"
+#include <utility>
 
-#pragma once
-#include <string>
-#include "asio.hpp"
-#include "snova/io/io.h"
+#include "asio/experimental/as_tuple.hpp"
+
 namespace snova {
-class WebSocket : public IOConnection {
- public:
-  explicit WebSocket(IOConnectionPtr&& io);
-  asio::any_io_executor GetExecutor() override;
-  asio::awaitable<std::error_code> AsyncConnect(const std::string& host);
-  asio::awaitable<std::error_code> AsyncAccept();
-  asio::awaitable<IOResult> AsyncWrite(const asio::const_buffer& buffers) override;
-  asio::awaitable<IOResult> AsyncWrite(const std::vector<::asio::const_buffer>& buffers) override;
-  asio::awaitable<IOResult> AsyncRead(const asio::mutable_buffer& buffers) override;
-  void Close() override;
+BufferedIO::BufferedIO(IOConnectionPtr&& io) : io_(std::move(io)), offset_(0), length_(0) {
+  recv_buffer_ = get_iobuf(kMaxChunkSize);
+}
 
- private:
-  IOConnectionPtr io_;
-  bool is_server_ = false;
-};
+asio::any_io_executor BufferedIO::GetExecutor() { return io_->GetExecutor(); }
+asio::awaitable<IOResult> BufferedIO::AsyncWrite(const asio::const_buffer& buffers) {
+  co_return co_await io_->AsyncWrite(buffers);
+}
+asio::awaitable<IOResult> BufferedIO::AsyncWrite(const std::vector<::asio::const_buffer>& buffers) {
+  co_return co_await io_->AsyncWrite(buffers);
+}
+asio::awaitable<IOResult> BufferedIO::AsyncRead(const asio::mutable_buffer& buffers) {
+  if (offset_ >= length_) {
+    offset_ = 0;
+    length_ = 0;
+    auto [n, ec] = co_await io_->AsyncRead(::asio::buffer(recv_buffer_->data(), kMaxChunkSize));
+    if (ec) {
+      co_return IOResult{0, ec};
+    }
+    length_ = n;
+  }
+  if (offset_ < length_) {
+    size_t read_len = (length_ - offset_);
+    if (buffers.size() < read_len) {
+      read_len = buffers.size();
+    }
+    memcpy(buffers.data(), recv_buffer_->data() + offset_, read_len);
+    offset_ += read_len;
+    co_return IOResult{read_len, std::error_code{}};
+  }
+  co_return IOResult{0, std::error_code{}};
+}
+void BufferedIO::Close() { io_->Close(); }
 }  // namespace snova

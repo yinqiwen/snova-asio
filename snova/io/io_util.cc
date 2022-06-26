@@ -26,7 +26,7 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "snova/io/read_until.h"
+#include "snova/io/io_util.h"
 #include "snova/io/tcp_socket.h"
 #include "snova/log/log_macros.h"
 
@@ -61,4 +61,20 @@ asio::awaitable<int> read_until(SocketRef socket, IOBufRef buf, size_t& readed_l
   TcpSocket tcp(socket);
   co_return co_await read_until(tcp, buf, readed_len, until);
 }
+asio::awaitable<std::error_code> read_exact(IOConnection& socket,
+                                            const asio::mutable_buffer& buffers) {
+  size_t pos = 0;
+  size_t rest = buffers.size();
+  uint8_t* read_buffer = reinterpret_cast<uint8_t*>(buffers.data());
+  while (rest > 0) {
+    auto [n, ec] = co_await socket.AsyncRead(::asio::buffer(read_buffer + pos, rest));
+    if (ec) {
+      co_return ec;
+    }
+    rest -= n;
+    pos += n;
+  }
+  co_return std::error_code{};
+}
+
 }  // namespace snova

@@ -23,7 +23,7 @@ cc_library(
     deps = [
         ":relay",
         "//snova/io",
-        "//snova/io:read_until",
+        "//snova/io:io_util",
         "//snova/log:log_api",
         "//snova/util:address",
         "//snova/util:flags",

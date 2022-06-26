@@ -29,6 +29,7 @@
 #include "snova/util/address.h"
 #include <vector>
 #include "absl/strings/str_split.h"
+#include "snova/log/log_macros.h"
 #include "snova/util/net_helper.h"
 
 namespace snova {
@@ -42,7 +43,7 @@ PaserAddressResult NetAddress::Parse(const std::string& addr) {
   }
   absl::string_view host_port_part = url_part;
   absl::string_view path;
-  auto pos = url_part.find('/') != absl::string_view::npos;
+  auto pos = url_part.find('/');
   if (pos != absl::string_view::npos) {
     host_port_part = url_part.substr(0, pos);
     if (url_part.size() > (pos + 1)) {
@@ -51,12 +52,14 @@ PaserAddressResult NetAddress::Parse(const std::string& addr) {
   }
   std::vector<absl::string_view> host_ports = absl::StrSplit(host_port_part, ':');
   if (host_ports.size() != 2) {
+    // SNOVA_ERROR("{} {}# {}#", schema_url_parts.size(), host_port_part, url_part);
     return PaserAddressResult{nullptr, std::make_error_code(std::errc::invalid_argument)};
   }
   uint16_t port = 0;
   try {
     port = std::stoi(std::string(host_ports[1]));
   } catch (...) {
+    // SNOVA_ERROR("{}", host_ports[1]);
     return PaserAddressResult{nullptr, std::make_error_code(std::errc::invalid_argument)};
   }
   absl::string_view host_view = host_ports[0];

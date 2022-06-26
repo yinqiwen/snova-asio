@@ -81,6 +81,7 @@ cc_library(
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
         ":net_helper",
+        "//snova/log:log_api",
         "@asio",
         "@com_google_absl//absl/strings",
     ],
@@ -96,7 +97,7 @@ cc_library(
     ],
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
-        "//snova/io:read_until",
+        "//snova/io:io_util",
         "//snova/log:log_api",
         "@asio",
         "@com_google_absl//absl/strings",
