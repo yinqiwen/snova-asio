@@ -30,7 +30,9 @@
 #pragma once
 #include <memory>
 #include <string>
+#include <vector>
 #include "asio.hpp"
+#include "asio/experimental/as_tuple.hpp"
 #include "asio/ssl.hpp"
 #include "snova/io/io.h"
 #include "snova/util/net_helper.h"
@@ -44,12 +46,22 @@ class TlsSocket : public IOConnection {
   asio::any_io_executor GetExecutor() override;
   asio::awaitable<std::error_code> ClientHandshake();
   asio::awaitable<std::error_code> AsyncConnect(const std::string& host, uint16_t port);
-  asio::awaitable<IOResult> AsyncWrite(const asio::const_buffer& buffers) override;
-  asio::awaitable<IOResult> AsyncWrite(const std::vector<::asio::const_buffer>& buffers) override;
+  asio::awaitable<IOResult> AsyncWrite(const asio::const_buffer& buffers) override {
+    co_return co_await DoAsyncWrite(buffers);
+  }
+  asio::awaitable<IOResult> AsyncWrite(const std::vector<::asio::const_buffer>& buffers) override {
+    co_return co_await DoAsyncWrite(buffers);
+  }
   asio::awaitable<IOResult> AsyncRead(const asio::mutable_buffer& buffers) override;
   void Close() override;
 
  private:
+  template <typename T>
+  asio::awaitable<IOResult> DoAsyncWrite(const T& buffers) {
+    auto [ec, n] = co_await ::asio::async_write(
+        tls_socket_, buffers, ::asio::experimental::as_tuple(::asio::use_awaitable));
+    co_return IOResult{n, ec};
+  }
   ::asio::ssl::context tls_ctx_;
   ASIOTlsSocket tls_socket_;
 };

@@ -29,7 +29,6 @@
 #include "snova/io/tls_socket.h"
 #include <string>
 #include <utility>
-#include "asio/experimental/as_tuple.hpp"
 
 namespace snova {
 TlsSocket::TlsSocket(::asio::ip::tcp::socket&& sock)
@@ -58,16 +57,7 @@ asio::awaitable<std::error_code> TlsSocket::AsyncConnect(const std::string& host
   }
   co_return co_await ClientHandshake();
 }
-asio::awaitable<IOResult> TlsSocket::AsyncWrite(const asio::const_buffer& buffers) {
-  auto [ec, n] = co_await ::asio::async_write(
-      tls_socket_, buffers, ::asio::experimental::as_tuple(::asio::use_awaitable));
-  co_return IOResult{n, ec};
-}
-asio::awaitable<IOResult> TlsSocket::AsyncWrite(const std::vector<::asio::const_buffer>& buffers) {
-  auto [ec, n] = co_await ::asio::async_write(
-      tls_socket_, buffers, ::asio::experimental::as_tuple(::asio::use_awaitable));
-  co_return IOResult{n, ec};
-}
+
 asio::awaitable<IOResult> TlsSocket::AsyncRead(const asio::mutable_buffer& buffers) {
   auto [ec, n] = co_await tls_socket_.async_read_some(
       buffers, ::asio::experimental::as_tuple(::asio::use_awaitable));

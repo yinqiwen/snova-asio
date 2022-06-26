@@ -29,6 +29,7 @@
 
 #pragma once
 #include <string>
+#include <vector>
 #include "asio.hpp"
 #include "snova/io/io.h"
 namespace snova {

@@ -29,24 +29,13 @@
 #include "snova/io/tcp_socket.h"
 #include <utility>
 
-#include "asio/experimental/as_tuple.hpp"
-
 namespace snova {
 TcpSocket::TcpSocket(::asio::ip::tcp::socket& sock) : socket_(sock) {}
 TcpSocket::TcpSocket(::asio::ip::tcp::socket&& sock)
     : own_socket_{std::make_unique<::asio::ip::tcp::socket>(std::move(sock))},
       socket_(*own_socket_) {}
 asio::any_io_executor TcpSocket::GetExecutor() { return socket_.get_executor(); }
-asio::awaitable<IOResult> TcpSocket::AsyncWrite(const asio::const_buffer& buffers) {
-  auto [ec, n] = co_await ::asio::async_write(
-      socket_, buffers, ::asio::experimental::as_tuple(::asio::use_awaitable));
-  co_return IOResult{n, ec};
-}
-asio::awaitable<IOResult> TcpSocket::AsyncWrite(const std::vector<::asio::const_buffer>& buffers) {
-  auto [ec, n] = co_await ::asio::async_write(
-      socket_, buffers, ::asio::experimental::as_tuple(::asio::use_awaitable));
-  co_return IOResult{n, ec};
-}
+
 asio::awaitable<IOResult> TcpSocket::AsyncRead(const asio::mutable_buffer& buffers) {
   auto [ec, n] = co_await socket_.async_read_some(
       buffers, ::asio::experimental::as_tuple(::asio::use_awaitable));

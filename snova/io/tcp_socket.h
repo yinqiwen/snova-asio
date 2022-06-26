@@ -29,7 +29,9 @@
 
 #pragma once
 #include <memory>
+#include <vector>
 #include "asio.hpp"
+#include "asio/experimental/as_tuple.hpp"
 #include "snova/io/io.h"
 namespace snova {
 class TcpSocket : public IOConnection {
@@ -38,12 +40,22 @@ class TcpSocket : public IOConnection {
   explicit TcpSocket(::asio::ip::tcp::socket&& sock);
 
   asio::any_io_executor GetExecutor() override;
-  asio::awaitable<IOResult> AsyncWrite(const asio::const_buffer& buffers) override;
-  asio::awaitable<IOResult> AsyncWrite(const std::vector<::asio::const_buffer>& buffers) override;
+  asio::awaitable<IOResult> AsyncWrite(const asio::const_buffer& buffers) override {
+    co_return co_await DoAsyncWrite(buffers);
+  }
+  asio::awaitable<IOResult> AsyncWrite(const std::vector<::asio::const_buffer>& buffers) override {
+    co_return co_await DoAsyncWrite(buffers);
+  }
   asio::awaitable<IOResult> AsyncRead(const asio::mutable_buffer& buffers) override;
   void Close() override;
 
  private:
+  template <typename T>
+  asio::awaitable<IOResult> DoAsyncWrite(const T& buffers) {
+    auto [ec, n] = co_await ::asio::async_write(
+        socket_, buffers, ::asio::experimental::as_tuple(::asio::use_awaitable));
+    co_return IOResult{n, ec};
+  }
   std::unique_ptr<::asio::ip::tcp::socket> own_socket_;
   ::asio::ip::tcp::socket& socket_;
 };

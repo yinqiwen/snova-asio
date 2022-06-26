@@ -28,6 +28,7 @@
  */
 
 #include "snova/io/ws_socket.h"
+#include <memory>
 #include <string>
 #include <utility>
 #include "absl/strings/escaping.h"
