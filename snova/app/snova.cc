@@ -43,6 +43,7 @@
 #include "snova/mux/mux_client.h"
 #include "snova/server/entry_server.h"
 #include "snova/server/mux_server.h"
+#include "snova/util/address.h"
 #include "snova/util/flags.h"
 #include "snova/util/misc_helper.h"
 #include "snova/util/stat.h"
@@ -77,12 +78,13 @@ int main(int argc, char** argv) {
   app.set_version_flag("--version", TOSTRING(SNOVA_VERSION));
   app.set_config("--config", "", "Config file path", false);
   std::string listen = "0.0.0.0:48100";
-  app.add_option("--listen", listen, "Listen address");
+  std::vector<std::string> multi_listens;
+  app.add_option("--listen", multi_listens, "Listen address");
 
   std::string auth_user = "demo_user";
   app.add_option("--user", auth_user, "Auth user name");
   std::string proxy_server;
-  app.add_option("--proxy", proxy_server, "The proxy server to connect mux server.");
+  app.add_option("--proxy", proxy_server, "The proxy server to connect remote mux server.");
   std::string remote_server;
   app.add_option("--remote", remote_server, "Remote server address");
   app.add_option("--conn_num_per_server", snova::g_conn_num_per_server,
@@ -150,17 +152,22 @@ int main(int argc, char** argv) {
   }
 
   if (snova::g_is_entry_node || snova::g_is_middle_node) {
-    if (remote_server.empty()) {
-      error_exit("'remote' is empty for entry/middle node.");
+    if (multi_listens.empty()) {
+      error_exit("No 'listen' specified for entry/middle nide.");
       return -1;
     }
+    // if (remote_server.empty()) {
+    //   error_exit("'remote' is empty for entry/middle node.");
+    //   return -1;
+    // }
   }
+
   snova::GlobalFlags::GetIntance()->SetRemoteServer(remote_server);
   SNOVA_INFO("Snova start to run as {} node.",
              (snova::g_is_entry_node ? "ENTRY" : (snova::g_is_exit_node ? "EXIT" : "MIDDLE")));
   ::asio::io_context ctx;
 
-  if (snova::g_is_middle_node || snova::g_is_entry_node) {
+  if (!remote_server.empty()) {
     uint64_t client_id = snova::random_uint64(0, std::numeric_limits<uint64_t>::max());
     snova::MuxClient::GetInstance()->SetClientId(client_id);
     SNOVA_INFO("Generated client_id:{}", client_id);
@@ -173,21 +180,37 @@ int main(int argc, char** argv) {
             error_exit(fmt::format("Failed to init mux client with error:{}", ec));
             co_return;
           }
-          auto ex = co_await asio::this_coro::executor;
-          if (snova::g_is_entry_node) {
-            ::asio::co_spawn(ex, snova::start_entry_server(listen), ::asio::detached);
-          } else {
-            ::asio::co_spawn(
-                ctx, snova::start_mux_server(listen, server_cipher_method, server_cipher_key),
-                ::asio::detached);
-          }
         },
         ::asio::detached);
   }
-  if (snova::g_is_exit_node) {
-    ::asio::co_spawn(ctx, snova::start_mux_server(listen, server_cipher_method, server_cipher_key),
-                     ::asio::detached);
+  std::vector<std::unique_ptr<snova::NetAddress>> listen_addrs;
+  for (const auto& v : multi_listens) {
+    auto result = snova::NetAddress::Parse(v);
+    if (result.second) {
+      error_exit(fmt::format("Failed to parse listen address:{} with error:{}", v, result.second));
+    } else {
+      listen_addrs.emplace_back(std::move(result.first));
+      SNOVA_INFO("Listen address:{}", v);
+    }
   }
+  for (auto& listen_addr : listen_addrs) {
+    bool is_mux_server = true;  // mux server or entry server
+    if (snova::g_is_exit_node || snova::g_is_middle_node) {
+      is_mux_server = true;  // all listen in middle/exit node is mux server
+    } else {
+      if (listen_addr->schema.empty() || listen_addr->schema == "socks5") {
+        is_mux_server = false;
+      }
+    }
+    if (is_mux_server) {
+      ::asio::co_spawn(
+          ctx, snova::start_mux_server(*listen_addr, server_cipher_method, server_cipher_key),
+          ::asio::detached);
+    } else {
+      ::asio::co_spawn(ctx, snova::start_entry_server(*listen_addr), ::asio::detached);
+    }
+  }
+
   init_stats();
   if (stat_log_period_secs > 0) {
     ::asio::co_spawn(ctx, snova::start_stat_timer(stat_log_period_secs), ::asio::detached);

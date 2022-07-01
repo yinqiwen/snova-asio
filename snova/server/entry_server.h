@@ -36,8 +36,9 @@
 #include "asio.hpp"
 #include "asio/experimental/awaitable_operators.hpp"
 #include "snova/io/io.h"
+#include "snova/util/address.h"
 namespace snova {
-asio::awaitable<std::error_code> start_entry_server(const std::string& addr);
+asio::awaitable<std::error_code> start_entry_server(const NetAddress& addr);
 
 asio::awaitable<void> handle_socks5_connection(::asio::ip::tcp::socket&& sock,
                                                IOBufPtr&& read_buffer, const Bytes& readable_data);

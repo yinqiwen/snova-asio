@@ -139,10 +139,11 @@ static ::asio::awaitable<void> server_loop(::asio::ip::tcp::acceptor server,
   co_return;
 }
 
-asio::awaitable<std::error_code> start_mux_server(const std::string& addr,
+asio::awaitable<std::error_code> start_mux_server(const NetAddress& server_address,
                                                   const std::string& cipher_method,
                                                   const std::string& cipher_key) {
-  SNOVA_INFO("Start listen on address [{}] with cipher_method:{}", addr, cipher_method);
+  SNOVA_INFO("Start listen on address [{}] with cipher_method:{}", server_address.String(),
+             cipher_method);
   register_stat_func([]() -> StatValues {
     StatValues vals;
     auto& kv = vals["MuxServer"];
@@ -153,19 +154,19 @@ asio::awaitable<std::error_code> start_mux_server(const std::string& addr,
   if (!cipher_ctx) {
     co_return std::make_error_code(std::errc::invalid_argument);
   }
-  PaserAddressResult parse_result = NetAddress::Parse(addr);
-  if (parse_result.second) {
-    co_return parse_result.second;
-  }
-  auto server_address = std::move(parse_result.first);
+  // PaserAddressResult parse_result = NetAddress::Parse(addr);
+  // if (parse_result.second) {
+  //   co_return parse_result.second;
+  // }
+  // auto server_address = std::move(parse_result.first);
   MuxConnectionType conn_type = MuxConnectionType::MUX_OVER_TCP;
-  if (server_address->schema == "ws") {
+  if (server_address.schema == "ws") {
     conn_type = MuxConnectionType::MUX_OVER_WEBSOCKET;
   }
 
   auto ex = co_await asio::this_coro::executor;
   ::asio::ip::tcp::endpoint endpoint;
-  auto resolve_ec = co_await server_address->GetEndpoint(&endpoint);
+  auto resolve_ec = co_await server_address.GetEndpoint(&endpoint);
   if (resolve_ec) {
     co_return resolve_ec;
   }
@@ -175,12 +176,12 @@ asio::awaitable<std::error_code> start_mux_server(const std::string& addr,
   std::error_code ec;
   acceptor.bind(endpoint, ec);
   if (ec) {
-    SNOVA_ERROR("Failed to bind {} with error:{}", addr, ec.message());
+    SNOVA_ERROR("Failed to bind {} with error:{}", server_address.String(), ec.message());
     co_return ec;
   }
   acceptor.listen(::asio::socket_base::max_listen_connections, ec);
   if (ec) {
-    SNOVA_ERROR("Failed to listen {} with error:{}", addr, ec.message());
+    SNOVA_ERROR("Failed to listen {} with error:{}", server_address.String(), ec.message());
     co_return ec;
   }
 
