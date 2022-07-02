@@ -38,13 +38,20 @@
 #include "snova/mux/mux_stream.h"
 
 namespace snova {
+
+struct RelayContext {
+  std::string remote_host;
+  uint16_t remote_port = 0;
+  bool is_tls = false;
+  bool is_tcp = false;
+  bool direct = false;
+};
+
 asio::awaitable<void> relay_direct(::asio::ip::tcp::socket&& sock, const Bytes& readed_data,
-                                   const std::string& remote_host, uint16_t remote_port,
-                                   bool is_tcp);
+                                   RelayContext& relay_ctx);
 asio::awaitable<void> relay(::asio::ip::tcp::socket&& sock, const Bytes& readed_data,
-                            const std::string& remote_host, uint16_t remote_port, bool is_tcp);
-asio::awaitable<void> relay(StreamPtr stream, const Bytes& readed_data,
-                            const std::string& remote_host, uint16_t remote_port, bool is_tcp);
+                            RelayContext& relay_ctx);
+asio::awaitable<void> relay(StreamPtr stream, const Bytes& readed_data, RelayContext& relay_ctx);
 
 asio::awaitable<void> relay_handler(const std::string& user, uint64_t client_id,
                                     std::unique_ptr<MuxEvent>&& open_request);

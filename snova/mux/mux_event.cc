@@ -45,6 +45,8 @@ int MuxEventHead::Encode(MutableBytes& buffer) {
   memcpy(buffer.data() + pos, &length, sizeof(length));
   pos += sizeof(length);
   buffer.data()[pos] = this->type;
+  pos++;
+  memcpy(buffer.data() + pos, &(this->flags), 1);
   return 0;
 }
 int MuxEventHead::Decode(const Bytes& buffer) {
@@ -61,6 +63,8 @@ int MuxEventHead::Decode(const Bytes& buffer) {
   this->len = big_to_native(len);
   pos += sizeof(len);
   this->type = buffer.data()[pos];
+  pos++;
+  memcpy(&(this->flags), buffer.data() + pos, 1);
   return 0;
 }
 
@@ -181,7 +185,7 @@ int StreamOpenRequest::Encode(MutableBytes& buffer) const {
   size_t pos = remote_host.size() + 2;
   encode_int(buffer, pos, remote_port);
   pos += sizeof(remote_port);
-  buffer.data()[pos] = (is_tcp ? 1 : 0);
+  memcpy(buffer.data() + pos, &flags, 1);
   pos += 1;
   buffer.remove_suffix(buffer.size() - pos);
   return 0;
@@ -191,7 +195,11 @@ int StreamOpenRequest::Decode(const Bytes& buffer) {
   size_t pos = remote_host.size() + 2;
   RETURN_NOT_OK(decode_int(buffer, pos, remote_port));
   pos += sizeof(remote_port);
-  RETURN_NOT_OK(decode_bool(buffer, pos, is_tcp));
+  if (buffer.size() < (pos + 1)) {
+    return ERR_TOO_SMALL_EVENT_DECODE_CONTENT;
+  }
+  memcpy(&flags, buffer.data() + pos, 1);
+  // RETURN_NOT_OK(decode_bool(buffer, pos, is_tcp));
   return 0;
 }
 

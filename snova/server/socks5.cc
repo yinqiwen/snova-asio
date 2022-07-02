@@ -80,7 +80,7 @@ asio::awaitable<void> handle_socks5_connection(::asio::ip::tcp::socket&& s, IOBu
   remote_port = read_buffer[n - 2];
   remote_port = ((remote_port << 8) + read_buffer[n - 1]);
   std::string remote_host;
-
+  std::unique_ptr<::asio::ip::tcp::endpoint> remote_endpoint;
   switch (target_addr_type) {
     case kAddrIPV4: {
       if (n != 10) {
@@ -89,7 +89,9 @@ asio::awaitable<void> handle_socks5_connection(::asio::ip::tcp::socket&& s, IOBu
       }
       std::array<uint8_t, 4> v4_ip = {read_buffer[4], read_buffer[5], read_buffer[6],
                                       read_buffer[7]};
-      remote_host = asio::ip::make_address_v4(v4_ip).to_string();
+      remote_endpoint = std::make_unique<::asio::ip::tcp::endpoint>(
+          asio::ip::make_address_v4(v4_ip), remote_port);
+      remote_host = remote_endpoint->address().to_string();
       break;
     }
     case kAddrIPV6: {
@@ -102,7 +104,9 @@ asio::awaitable<void> handle_socks5_connection(::asio::ip::tcp::socket&& s, IOBu
           read_buffer[8],  read_buffer[9],  read_buffer[10], read_buffer[11],
           read_buffer[12], read_buffer[13], read_buffer[14], read_buffer[15],
           read_buffer[16], read_buffer[17], read_buffer[18], read_buffer[19]};
-      remote_host = asio::ip::make_address_v6(v6_ip).to_string();
+      remote_endpoint = std::make_unique<::asio::ip::tcp::endpoint>(
+          asio::ip::make_address_v6(v6_ip), remote_port);
+      remote_host = remote_endpoint->address().to_string();
       break;
     }
     case kAddrDomain: {
@@ -128,18 +132,33 @@ asio::awaitable<void> handle_socks5_connection(::asio::ip::tcp::socket&& s, IOBu
   socks5_resp[3] = 1;  // socksAtypeV4         = 0x01
   co_await ::asio::async_write(sock, ::asio::buffer(socks5_resp, 10),
                                ::asio::experimental::as_tuple(::asio::use_awaitable));
-  if (remote_port == 443 && target_addr_type != kAddrDomain) {
-    // redirect to sni proxy
-    auto [rec, rn] =
-        co_await sock.async_read_some(::asio::buffer(read_buffer.data(), read_buffer.size()),
-                                      ::asio::experimental::as_tuple(::asio::use_awaitable));
-    if (rec) {
-      SNOVA_ERROR("Failed to read local connection with error:{}", rec);
+
+  auto [rec, rn] =
+      co_await sock.async_read_some(::asio::buffer(read_buffer.data(), read_buffer.size()),
+                                    ::asio::experimental::as_tuple(::asio::use_awaitable));
+  if (rec) {
+    SNOVA_ERROR("Failed to read local connection with error:{}", rec);
+    co_return;
+  }
+  if (rn > 3 && read_buffer[0] == 0x16) {  // tls
+    auto tls_major_ver = read_buffer[1];
+    if (tls_major_ver < 3) {
+      // no SNI before sslv3
+      SNOVA_ERROR("sslv2/sslv1 not supported!");
       co_return;
     }
     Bytes client_hello(read_buffer.data(), rn);
-    co_await handle_tls_connection(std::move(sock), std::move(conn_read_buffer), client_hello);
+    bool success = co_await handle_tls_connection(std::move(sock), std::move(conn_read_buffer),
+                                                  client_hello, std::move(remote_endpoint));
+    if (success) {
+      co_return;
+    }
   }
-  co_await relay(std::move(sock), Bytes{}, remote_host, remote_port, true);
+
+  RelayContext relay_ctx;
+  relay_ctx.remote_host = std::move(remote_host);
+  relay_ctx.remote_port = remote_port;
+  relay_ctx.is_tcp = true;
+  co_await relay(std::move(sock), Bytes{}, relay_ctx);
 }
 }  // namespace snova

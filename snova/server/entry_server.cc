@@ -91,7 +91,8 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
       SNOVA_ERROR("sslv2/sslv1 not supported!");
       co_return;
     }
-    bool success = co_await handle_tls_connection(std::move(sock), std::move(buffer), readable);
+    bool success = co_await handle_tls_connection(std::move(sock), std::move(buffer), readable,
+                                                  std::move(remote_endpoint));
     if (success) {
       co_return;
     }
@@ -108,8 +109,11 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
   if (remote_endpoint) {
     // just relay to direct
     SNOVA_INFO("Redirect proxy connection to {}.", *remote_endpoint);
-    co_await relay_direct(std::move(sock), readable, remote_endpoint->address().to_string(),
-                          remote_endpoint->port(), true);
+    RelayContext relay_ctx;
+    relay_ctx.remote_host = remote_endpoint->address().to_string();
+    relay_ctx.remote_port = remote_endpoint->port();
+    relay_ctx.is_tcp = true;
+    co_await relay_direct(std::move(sock), readable, relay_ctx);
   } else {
     // no remote host&port to relay
   }

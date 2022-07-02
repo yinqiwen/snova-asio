@@ -42,12 +42,17 @@ class MuxStream;
 using MuxStreamPtr = std::shared_ptr<MuxStream>;
 class MuxStream : public Stream {
  public:
-  asio::awaitable<std::error_code> Open(const std::string& host, uint16_t port, bool is_tcp);
+  asio::awaitable<std::error_code> Open(const std::string& host, uint16_t port, bool is_tcp,
+                                        bool is_tls);
   asio::awaitable<std::error_code> Offer(IOBufPtr&& buf, size_t len);
   asio::awaitable<StreamReadResult> Read() override;
   asio::awaitable<std::error_code> Write(IOBufPtr&& buf, size_t len) override;
   asio::awaitable<std::error_code> Close(bool close_by_remote) override;
   uint32_t GetID() const override { return sid_; }
+  bool IsTLS() const override { return is_tls_; }
+
+  void SetTLS(bool v) { is_tls_ = v; }
+
   ~MuxStream();
 
   static uint32_t NextID(bool is_client);
@@ -83,6 +88,7 @@ class MuxStream : public Stream {
   StreamDataChannel data_channel_;
   uint64_t client_id_;
   uint32_t sid_;
+  bool is_tls_;
   bool closed_;
 };
 
