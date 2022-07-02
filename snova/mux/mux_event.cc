@@ -216,13 +216,13 @@ int RetireConnRequest::Encode(MutableBytes& buffer) const {
 int RetireConnRequest::Decode(const Bytes& buffer) { return 0; }
 
 int StreamChunk::Encode(MutableBytes& buffer) const {
-  if (buffer.size() < (sizeof(chunk_len) + chunk_len)) {
-    SNOVA_INFO("Require {}bytes, but got {} bytes.", (sizeof(chunk_len) + chunk_len),
-               buffer.size());
+  if (buffer.size() < chunk_len) {
+    SNOVA_INFO("Require {}bytes, but got {} bytes.", chunk_len, buffer.size());
     return ERR_TOO_LARGE_EVENT_ENCODE_CONTENT;
   }
-  encode_int(buffer, 0, chunk_len);
-  size_t pos = sizeof(chunk_len);
+  // encode_int(buffer, 0, chunk_len);
+  // size_t pos = sizeof(chunk_len);
+  size_t pos = 0;
   if (chunk_len > 0) {
     memcpy(buffer.data() + pos, chunk->data(), chunk_len);
     pos += chunk_len;
@@ -231,16 +231,16 @@ int StreamChunk::Encode(MutableBytes& buffer) const {
   return 0;
 }
 int StreamChunk::Decode(const Bytes& buffer) {
-  RETURN_NOT_OK(decode_int(buffer, 0, chunk_len));
+  // RETURN_NOT_OK(decode_int(buffer, 0, chunk_len));
+  chunk_len = head.len;
   if (chunk_len > 2 * kMaxChunkSize) {
     return ERR_INVALID_EVENT;
   }
-  size_t pos = sizeof(chunk_len);
-  if (buffer.size() < (pos + chunk_len)) {
+  if (buffer.size() < chunk_len) {
     return ERR_TOO_SMALL_EVENT_DECODE_CONTENT;
   }
   chunk = get_iobuf(chunk_len);
-  memcpy(chunk->data(), buffer.data() + pos, chunk_len);
+  memcpy(chunk->data(), buffer.data(), chunk_len);
   return 0;
 }
 

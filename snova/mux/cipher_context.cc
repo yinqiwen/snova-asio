@@ -106,14 +106,20 @@ int CipherContext::Encrypt(std::unique_ptr<MuxEvent>& in, MutableBytes& out) {
     out.remove_suffix(out.size() - total_len);
     return 0;
   }
-
-  MutableBytes body_buffer(encode_buffer_.data() + kEventHeadSize,
-                           encode_buffer_.size() - kEventHeadSize);
-  int rc = in->Encode(body_buffer);
+  std::unique_ptr<MutableBytes> body_buffer;
+  if (in->head.flags.body_no_encrypt) {
+    body_buffer = std::make_unique<MutableBytes>(out.data() + kEventHeadSize + cipher_tag_len_,
+                                                 out.size() - kEventHeadSize - cipher_tag_len_);
+    // avoid copy after header encrypt
+  } else {
+    body_buffer = std::make_unique<MutableBytes>(encode_buffer_.data() + kEventHeadSize,
+                                                 encode_buffer_.size() - kEventHeadSize);
+  }
+  int rc = in->Encode(*body_buffer);
   if (0 != rc) {
     return rc;
   }
-  in->head.len = body_buffer.size();
+  in->head.len = body_buffer->size();
   MutableBytes head_buffer(encode_buffer_.data(), kEventHeadSize);
   rc = in->head.Encode(head_buffer);
   if (0 != rc) {
@@ -132,13 +138,13 @@ int CipherContext::Encrypt(std::unique_ptr<MuxEvent>& in, MutableBytes& out) {
     return rc;
   }
   size_t header_len = olen;
-  size_t body_len = body_buffer.size();
+  size_t body_len = body_buffer->size();
 
   if (body_len > 0) {
     if (in->head.flags.body_no_encrypt == 0) {
       rc = mbedtls_cipher_auth_encrypt_ext(&encrypt_ctx_, nonce.data(), iv_len_, nullptr, 0,
-                                           (const unsigned char*)body_buffer.data(),
-                                           body_buffer.size(), out.data() + header_len,
+                                           (const unsigned char*)body_buffer->data(),
+                                           body_buffer->size(), out.data() + header_len,
                                            out.size() - header_len, &olen, cipher_tag_len_);
       if (0 != rc) {
         SNOVA_ERROR("Failed to encrypt event body with rc:{}", rc);
@@ -146,7 +152,7 @@ int CipherContext::Encrypt(std::unique_ptr<MuxEvent>& in, MutableBytes& out) {
       }
       body_len = olen;
     } else {
-      memcpy(out.data() + header_len, body_buffer.data(), body_len);
+      // memcpy(out.data() + header_len, body_buffer.data(), body_len);
       // SNOVA_INFO("[{}/{}]Encrypt no encrypt data len:{}", in->head.sid, in->head.type, body_len);
     }
   }
@@ -204,11 +210,14 @@ int CipherContext::Decrypt(const Bytes& in, std::unique_ptr<MuxEvent>& out, size
     decrypt_iv_++;
     return 0;
   }
+  Bytes decode_body;
   if (MBEDTLS_CIPHER_NONE == cipher_type_) {
-    memcpy(decode_buffer_.data(), in.data() + kEventHeadSize, head.len);
+    decode_body = Bytes{in.data() + kEventHeadSize, head.len};
+    // memcpy(decode_buffer_.data(), in.data() + kEventHeadSize, head.len);
     decrypt_len += head.len;
   } else if (head.flags.body_no_encrypt > 0) {
-    memcpy(decode_buffer_.data(), in.data() + kEventHeadSize + cipher_tag_len_, head.len);
+    decode_body = Bytes{in.data() + kEventHeadSize + cipher_tag_len_, head.len};
+    // memcpy(decode_buffer_.data(), in.data() + kEventHeadSize + cipher_tag_len_, head.len);
     decrypt_len += head.len;
     // SNOVA_INFO("[{}/{}]Decrypt no encrypt data len:{}", head.sid, head.type, head.len);
   } else {
@@ -223,11 +232,12 @@ int CipherContext::Decrypt(const Bytes& in, std::unique_ptr<MuxEvent>& out, size
       SNOVA_ERROR("Failed to decrypt event body with rc:{}, data len:{}", rc, head.len);
       return rc;
     }
+    decode_body = Bytes{decode_buffer_.data(), head.len};
     // SNOVA_INFO("Decrypt total len:{}", olen);
     decrypt_len += (head.len + cipher_tag_len_);
   }
   // SNOVA_INFO("Decrypt buffer len:{}, type:{}", head.len, head.type);
-  int rc = out->Decode(Bytes{decode_buffer_.data(), head.len});
+  int rc = out->Decode(decode_body);
   if (0 != rc) {
     out = nullptr;
     return rc;
