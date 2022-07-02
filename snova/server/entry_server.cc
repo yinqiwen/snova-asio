@@ -51,7 +51,7 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
   g_local_proxy_conn_num++;
   absl::Cleanup source_closer = [] { g_local_proxy_conn_num--; };
   std::unique_ptr<::asio::ip::tcp::endpoint> remote_endpoint;
-  if (g_is_entry_node && g_is_redirect_node) {
+  if (g_is_redirect_node) {
     remote_endpoint = std::make_unique<::asio::ip::tcp::endpoint>();
     if (0 != get_orig_dst(sock.native_handle(), remote_endpoint.get())) {
       remote_endpoint.release();
@@ -91,7 +91,8 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
       SNOVA_ERROR("sslv2/sslv1 not supported!");
       co_return;
     }
-    bool success = co_await handle_tls_connection(std::move(sock), std::move(buffer), readable);
+    bool success = co_await handle_tls_connection(std::move(sock), std::move(buffer), readable,
+                                                  std::move(remote_endpoint));
     if (success) {
       co_return;
     }
@@ -108,8 +109,11 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock) {
   if (remote_endpoint) {
     // just relay to direct
     SNOVA_INFO("Redirect proxy connection to {}.", *remote_endpoint);
-    co_await relay_direct(std::move(sock), readable, remote_endpoint->address().to_string(),
-                          remote_endpoint->port(), true);
+    RelayContext relay_ctx;
+    relay_ctx.remote_host = remote_endpoint->address().to_string();
+    relay_ctx.remote_port = remote_endpoint->port();
+    relay_ctx.is_tcp = true;
+    co_await relay_direct(std::move(sock), readable, relay_ctx);
   } else {
     // no remote host&port to relay
   }
@@ -150,13 +154,7 @@ static ::asio::awaitable<void> server_loop(::asio::ip::tcp::acceptor server) {
   co_return;
 }
 
-asio::awaitable<std::error_code> start_entry_server(const std::string& addr) {
-  PaserAddressResult parse_result = NetAddress::Parse(addr);
-  if (parse_result.second) {
-    co_return parse_result.second;
-  }
-  auto server_address = std::move(parse_result.first);
-
+asio::awaitable<std::error_code> start_entry_server(const NetAddress& server_address) {
   register_stat_func([]() -> StatValues {
     StatValues vals;
     auto& kv = vals["LocalServer"];
@@ -166,7 +164,7 @@ asio::awaitable<std::error_code> start_entry_server(const std::string& addr) {
 
   auto ex = co_await asio::this_coro::executor;
   ::asio::ip::tcp::endpoint endpoint;
-  auto resolve_ec = co_await server_address->GetEndpoint(&endpoint);
+  auto resolve_ec = co_await server_address.GetEndpoint(&endpoint);
   if (resolve_ec) {
     co_return resolve_ec;
   }
@@ -176,15 +174,15 @@ asio::awaitable<std::error_code> start_entry_server(const std::string& addr) {
   std::error_code ec;
   acceptor.bind(endpoint, ec);
   if (ec) {
-    SNOVA_ERROR("Failed to bind {} with error:{}", addr, ec.message());
+    SNOVA_ERROR("Failed to bind {} with error:{}", server_address.String(), ec.message());
     co_return ec;
   }
   acceptor.listen(::asio::socket_base::max_listen_connections, ec);
   if (ec) {
-    SNOVA_ERROR("Failed to listen {} with error:{}", addr, ec.message());
+    SNOVA_ERROR("Failed to listen {} with error:{}", server_address.String(), ec.message());
     co_return ec;
   }
-  SNOVA_INFO("Start listen on address:{}.", addr);
+  SNOVA_INFO("Start listen on address:{}.", server_address.String());
   ::asio::co_spawn(ex, server_loop(std::move(acceptor)), ::asio::detached);
   co_return ec;
 }

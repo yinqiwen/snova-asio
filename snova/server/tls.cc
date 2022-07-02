@@ -32,9 +32,14 @@
 #include "snova/util/sni.h"
 
 namespace snova {
-asio::awaitable<bool> handle_tls_connection(::asio::ip::tcp::socket&& s, IOBufPtr&& rbuf,
-                                            const Bytes& readable_data) {
-  SNOVA_INFO("Handle proxy connection by tls.");
+asio::awaitable<bool> handle_tls_connection(
+    ::asio::ip::tcp::socket&& s, IOBufPtr&& rbuf, const Bytes& readable_data,
+    std::unique_ptr<::asio::ip::tcp::endpoint>&& orig_remote_endpoint) {
+  // SNOVA_INFO("Handle proxy connection by tls.");
+  uint16_t remote_port = 443;
+  if (orig_remote_endpoint) {
+    remote_port = orig_remote_endpoint->port();
+  }
   ::asio::ip::tcp::socket sock(std::move(s));  //  make rvalue sock not release after co_await
   IOBufPtr conn_read_buffer = std::move(rbuf);
   IOBuf& read_buffer = *conn_read_buffer;
@@ -44,13 +49,21 @@ asio::awaitable<bool> handle_tls_connection(::asio::ip::tcp::socket&& s, IOBufPt
     SNOVA_ERROR("Failed to read sni with rc:{}", rc);
     co_return false;
   }
+
   SNOVA_INFO("Retrive SNI:{} from tls connection.", remote_host);
   if (remote_host == "courier.push.apple.com") {
     co_return false;
-  } else {
-    uint16_t remote_port = 443;
-    co_await relay(std::move(sock), readable_data, remote_host, remote_port, true);
-    co_return true;
+    // remote_host =
+    // if (orig_remote_endpoint) {
+    //   remote_host = orig_remote_endpoint->address().to_string();
+    // }
   }
+  RelayContext relay_ctx;
+  relay_ctx.remote_host = std::move(remote_host);
+  relay_ctx.remote_port = remote_port;
+  relay_ctx.is_tcp = true;
+  relay_ctx.is_tls = true;
+  co_await relay(std::move(sock), readable_data, relay_ctx);
+  co_return true;
 }
 }  // namespace snova

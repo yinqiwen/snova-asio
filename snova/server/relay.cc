@@ -46,8 +46,7 @@ namespace snova {
 using CloseFunc = std::function<asio::awaitable<std::error_code>()>;
 template <typename T>
 static asio::awaitable<void> do_relay(T& local_stream, const Bytes& readed_data,
-                                      const std::string& remote_host, uint16_t remote_port,
-                                      bool is_tcp, bool direct) {
+                                      RelayContext& relay_ctx) {
   TransferRoutineFunc transfer_routine;
   uint32_t latest_io_time = time(nullptr);
   CancelFunc cancel_transfer_timeout;
@@ -78,9 +77,10 @@ static asio::awaitable<void> do_relay(T& local_stream, const Bytes& readed_data,
         [&]() -> uint32_t { return latest_io_time; }, g_stream_io_timeout_secs);
   }
 
-  bool direct_relay = (g_is_exit_node || direct);
+  bool direct_relay = (g_is_exit_node || relay_ctx.direct);
   if (direct_relay) {
-    auto remote_socket = co_await get_connected_socket(remote_host, remote_port, is_tcp);
+    auto remote_socket = co_await get_connected_socket(relay_ctx.remote_host, relay_ctx.remote_port,
+                                                       relay_ctx.is_tcp);
     if (remote_socket) {
       if (readed_data.size() > 0) {
         co_await ::asio::async_write(*remote_socket,
@@ -104,10 +104,12 @@ static asio::awaitable<void> do_relay(T& local_stream, const Bytes& readed_data,
     uint64_t client_id = MuxClient::GetInstance()->GetClientId();
     stream_id = MuxStream::NextID(true);
     MuxStreamPtr remote_stream = MuxStream::New(std::move(factory), ex, client_id, stream_id);
+    remote_stream->SetTLS(relay_ctx.is_tls);
     absl::Cleanup auto_remove_remove_stream = [client_id, stream_id] {
       MuxStream::Remove(client_id, stream_id);
     };
-    auto ec = co_await remote_stream->Open(remote_host, remote_port, is_tcp);
+    auto ec = co_await remote_stream->Open(relay_ctx.remote_host, relay_ctx.remote_port,
+                                           relay_ctx.is_tcp, relay_ctx.is_tls);
     if (readed_data.size() > 0) {
       IOBufPtr tmp_buf = get_iobuf(readed_data.size());
       memcpy(tmp_buf->data(), readed_data.data(), readed_data.size());
@@ -128,22 +130,24 @@ static asio::awaitable<void> do_relay(T& local_stream, const Bytes& readed_data,
 }
 
 asio::awaitable<void> relay(::asio::ip::tcp::socket&& sock, const Bytes& readed_data,
-                            const std::string& remote_host, uint16_t remote_port, bool is_tcp) {
+                            RelayContext& relay_ctx) {
   ::asio::ip::tcp::socket socket(std::move(sock));  //  make rvalue sock not release after co_await
-  co_await do_relay(socket, readed_data, remote_host, remote_port, is_tcp, false);
+  relay_ctx.direct = false;
+  co_await do_relay(socket, readed_data, relay_ctx);
 }
 
 asio::awaitable<void> relay(StreamPtr local_stream, const Bytes& readed_data,
-                            const std::string& remote_host, uint16_t remote_port, bool is_tcp) {
-  co_await do_relay(local_stream, readed_data, remote_host, remote_port, is_tcp, false);
+                            RelayContext& relay_ctx) {
+  relay_ctx.direct = false;
+  co_await do_relay(local_stream, readed_data, relay_ctx);
   co_await local_stream->Close(false);
 }
 
 asio::awaitable<void> relay_direct(::asio::ip::tcp::socket&& sock, const Bytes& readed_data,
-                                   const std::string& remote_host, uint16_t remote_port,
-                                   bool is_tcp) {
+                                   RelayContext& relay_ctx) {
   ::asio::ip::tcp::socket socket(std::move(sock));  //  make rvalue sock not release after co_await
-  co_await do_relay(socket, readed_data, remote_host, remote_port, is_tcp, true);
+  relay_ctx.direct = true;
+  co_await do_relay(socket, readed_data, relay_ctx);
 }
 
 asio::awaitable<void> relay_handler(const std::string& auth_user, uint64_t client_id,
@@ -160,11 +164,17 @@ asio::awaitable<void> relay_handler(const std::string& auth_user, uint64_t clien
       MuxConnManager::GetInstance()->GetEventWriterFactory(auth_user, client_id);
   uint32_t local_stream_id = open_request->head.sid;
   MuxStreamPtr local_stream = MuxStream::New(std::move(factory), ex, client_id, local_stream_id);
+  local_stream->SetTLS(open_request->flags.is_tls);
   absl::Cleanup auto_remove_local_stream = [client_id, local_stream_id] {
     MuxStream::Remove(client_id, local_stream_id);
   };
-  co_await do_relay(local_stream, {}, open_request->remote_host, open_request->remote_port,
-                    open_request->is_tcp, false);
+  RelayContext relay_ctx;
+  relay_ctx.remote_host = std::move(open_request->remote_host);
+  relay_ctx.remote_port = open_request->remote_port;
+  relay_ctx.is_tcp = open_request->flags.is_tcp;
+  relay_ctx.is_tls = open_request->flags.is_tls;
+  relay_ctx.direct = false;
+  co_await do_relay(local_stream, {}, relay_ctx);
   co_await local_stream->Close(false);
 }
 

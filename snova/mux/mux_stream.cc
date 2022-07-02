@@ -87,6 +87,7 @@ MuxStream::MuxStream(EventWriterFactory&& factory, const StreamDataChannelExecut
       data_channel_(ex, 1),
       client_id_(client_id),
       sid_(sid),
+      is_tls_(false),
       closed_(false) {
   event_writer_ = event_writer_factory_();
   g_active_stream_size++;
@@ -94,12 +95,15 @@ MuxStream::MuxStream(EventWriterFactory&& factory, const StreamDataChannelExecut
 MuxStream::~MuxStream() { g_active_stream_size--; }
 
 asio::awaitable<std::error_code> MuxStream::Open(const std::string& host, uint16_t port,
-                                                 bool is_tcp) {
+                                                 bool is_tcp, bool is_tls) {
   std::unique_ptr<StreamOpenRequest> open_request = std::make_unique<StreamOpenRequest>();
   open_request->head.sid = sid_;
   open_request->remote_host = host;
   open_request->remote_port = port;
-  open_request->is_tcp = is_tcp;
+  open_request->flags.is_tcp = is_tcp ? 1 : 0;
+  open_request->flags.is_tls = is_tls ? 1 : 0;
+
+  is_tls_ = is_tls;
   bool success = co_await WriteEvent(std::move(open_request));
   if (!success) {
     co_return std::make_error_code(std::errc::no_link);
@@ -135,6 +139,9 @@ asio::awaitable<StreamReadResult> MuxStream::Read() {
 asio::awaitable<std::error_code> MuxStream::Write(IOBufPtr&& buf, size_t len) {
   auto chunk = std::make_unique<StreamChunk>();
   chunk->head.sid = sid_;
+  if (is_tls_) {
+    chunk->head.flags.body_no_encrypt = 1;
+  }
   chunk->chunk = std::move(buf);
   chunk->chunk_len = len;
   bool success = co_await WriteEvent(std::move(chunk));

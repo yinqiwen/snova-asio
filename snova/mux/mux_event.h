@@ -46,10 +46,20 @@
 namespace snova {
 static constexpr uint16_t kEventHeadSize = 8;
 
+struct MuxFlags {
+  unsigned body_no_encrypt : 1;
+  unsigned reserved : 7;
+  MuxFlags() {
+    body_no_encrypt = 0;
+    reserved = 0;
+  }
+};
+
 struct MuxEventHead {
   uint32_t sid = 0;
   uint16_t len = 0;
   uint8_t type = 0;
+  MuxFlags flags;
   int Encode(MutableBytes& buffer);
   int Decode(const Bytes& buffer);
 };
@@ -102,10 +112,21 @@ struct RetireConnRequest : public MuxEvent {
   int Decode(const Bytes& buffer) override;
 };
 
+struct StreamOpenFlags {
+  unsigned is_tcp : 1;
+  unsigned is_tls : 1;
+  unsigned reserved : 6;
+  StreamOpenFlags() {
+    is_tcp = 1;
+    is_tls = 0;
+    reserved = 0;
+  }
+};
+
 struct StreamOpenRequest : public MuxEvent {
   std::string remote_host;
   uint16_t remote_port = 0;
-  bool is_tcp = true;
+  StreamOpenFlags flags;
   StreamOpenRequest() { head.type = EVENT_STREAM_OPEN; }
   int Encode(MutableBytes& buffer) const override;
   int Decode(const Bytes& buffer) override;

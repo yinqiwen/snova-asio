@@ -90,7 +90,8 @@ std::string NetAddress::String() const {
   return s;
 }
 
-asio::awaitable<std::error_code> NetAddress::GetEndpoint(::asio::ip::tcp::endpoint* endpoint) {
+asio::awaitable<std::error_code> NetAddress::GetEndpoint(
+    ::asio::ip::tcp::endpoint* endpoint) const {
   co_return co_await resolve_endpoint(host, port, endpoint);
 }
 }  // namespace snova

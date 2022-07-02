@@ -81,23 +81,26 @@ asio::awaitable<void> handle_http_connection(::asio::ip::tcp::socket&& s, IOBufP
     co_return;
   }
   absl::string_view method_view(http_headers_view.data(), pos);
-
+  RelayContext relay_ctx;
+  relay_ctx.remote_host.assign(host_view.data(), host_view.size());
+  relay_ctx.is_tcp = true;
   if (absl::EqualsIgnoreCase(method_view, "CONNECT")) {
     if (remote_port == 0) {
       remote_port = 443;
+      relay_ctx.is_tls = true;
     }
     absl::string_view conn_ok = "HTTP/1.0 200 Connection established\r\n\r\n";
     co_await ::asio::async_write(sock, ::asio::buffer(conn_ok.data(), conn_ok.size()),
                                  ::asio::experimental::as_tuple(::asio::use_awaitable));
     // tunnel
-    co_await relay(std::move(sock), Bytes{}, std::string(host_view.data(), host_view.size()),
-                   remote_port, true);
+    relay_ctx.remote_port = remote_port;
+    co_await relay(std::move(sock), Bytes{}, relay_ctx);
   } else {
     if (remote_port == 0) {
       remote_port = 80;
     }
-    co_await relay(std::move(sock), readable_data, std::string(host_view.data(), host_view.size()),
-                   remote_port, true);
+    relay_ctx.remote_port = remote_port;
+    co_await relay(std::move(sock), readable_data, relay_ctx);
   }
   co_return;
 

@@ -31,9 +31,10 @@
 #include <string>
 
 #include "asio.hpp"
+#include "snova/util/address.h"
 
 namespace snova {
-asio::awaitable<std::error_code> start_mux_server(const std::string& addr,
+asio::awaitable<std::error_code> start_mux_server(const NetAddress& addr,
                                                   const std::string& cipher_method,
                                                   const std::string& cipher_key);
 
