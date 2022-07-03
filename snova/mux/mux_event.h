@@ -91,9 +91,21 @@ struct MuxEvent {
 using EventWriter = std::function<asio::awaitable<bool>(std::unique_ptr<MuxEvent>&&)>;
 using EventWriterFactory = std::function<EventWriter()>;
 
+struct AuthFlags {
+  unsigned is_entry : 1;
+  unsigned is_exit : 1;
+  unsigned is_middle : 1;
+  unsigned reserved : 6;
+  AuthFlags() {
+    is_entry = 1;
+    is_exit = 0;
+    reserved = 0;
+  }
+};
 struct AuthRequest : public MuxEvent {
   std::string user;
   uint64_t client_id = 0;
+  AuthFlags flags;
   AuthRequest() { head.type = EVENT_AUTH_REQ; }
   int Encode(MutableBytes& buffer) const override;
   int Decode(const Bytes& buffer) override;

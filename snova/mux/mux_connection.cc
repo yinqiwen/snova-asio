@@ -135,9 +135,14 @@ asio::awaitable<ServerAuthResult> MuxConnection::ServerAuth() {
     SNOVA_ERROR("Recv non auth reqeust with type:{}", auth_req->head.type);
     co_return ServerAuthResult{"", 0, false};
   }
+  if ((g_is_entry_node && auth_req_event->flags.is_entry > 0) ||
+      (g_is_exit_node && auth_req_event->flags.is_exit > 0) ||
+      (g_is_middle_node && auth_req_event->flags.is_middle > 0)) {
+    SNOVA_ERROR("Invalid client role for current node.");
+    co_return ServerAuthResult{"", 0, false};
+  }
+
   uint64_t iv = random_uint64(0, 102 * 1024 * 1024LL);
-  // absl::BitGen bitgen;
-  // uint64_t iv = absl::Uniform(bitgen, 0, 102 * 1024 * 1024LL);
   std::unique_ptr<AuthResponse> auth_res = std::make_unique<AuthResponse>();
   auth_res->success = true;
   auth_res->iv = iv;
@@ -159,6 +164,15 @@ asio::awaitable<bool> MuxConnection::ClientAuth(const std::string& user, uint64_
   std::unique_ptr<AuthRequest> auth = std::make_unique<AuthRequest>();
   auth->user = user;
   auth->client_id = client_id;
+  if (g_is_entry_node) {
+    auth->flags.is_entry = 1;
+  }
+  if (g_is_exit_node) {
+    auth->flags.is_exit = 1;
+  }
+  if (g_is_middle_node) {
+    auth->flags.is_middle = 1;
+  }
   bool write_success = co_await WriteEvent(std::move(auth));
   if (!write_success) {
     SNOVA_ERROR("Write auth request failed.");

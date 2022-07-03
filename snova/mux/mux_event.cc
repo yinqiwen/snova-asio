@@ -157,13 +157,20 @@ int AuthRequest::Encode(MutableBytes& buffer) const {
   }
   encode_string(buffer, 0, user);
   encode_int(buffer, user.size() + 2, client_id);
-  size_t total = (user.size() + 2 + sizeof(client_id));
+  size_t pos = user.size() + 2 + sizeof(client_id);
+  memcpy(buffer.data() + pos, &flags, 1);
+  size_t total = (user.size() + 2 + sizeof(client_id) + 1);
   buffer.remove_suffix(buffer.size() - total);
   return 0;
 }
 int AuthRequest::Decode(const Bytes& buffer) {
   RETURN_NOT_OK(decode_string(buffer, 0, user));
   RETURN_NOT_OK(decode_int(buffer, user.size() + 2, client_id));
+  size_t pos = user.size() + 2 + sizeof(client_id);
+  if (buffer.size() < (pos + 1)) {
+    return ERR_TOO_SMALL_EVENT_DECODE_CONTENT;
+  }
+  memcpy(&flags, buffer.data() + pos, 1);
   return 0;
 }
 

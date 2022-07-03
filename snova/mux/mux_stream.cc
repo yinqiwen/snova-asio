@@ -32,7 +32,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/log/log_macros.h"
-#include "spdlog/fmt/bundled/ostream.h"
+#include "snova/util/flags.h"
 namespace snova {
 
 struct ClientStreamID {
@@ -85,6 +85,7 @@ MuxStream::MuxStream(EventWriterFactory&& factory, const StreamDataChannelExecut
                      uint64_t client_id, uint32_t sid)
     : event_writer_factory_(std::move(factory)),
       data_channel_(ex, 1),
+      write_bytes_(0),
       client_id_(client_id),
       sid_(sid),
       is_tls_(false),
@@ -140,10 +141,16 @@ asio::awaitable<std::error_code> MuxStream::Write(IOBufPtr&& buf, size_t len) {
   auto chunk = std::make_unique<StreamChunk>();
   chunk->head.sid = sid_;
   if (is_tls_) {
-    chunk->head.flags.body_no_encrypt = 1;
+    if (write_bytes_ == 0 && g_is_entry_node) {
+      // first chunk contains client_hello which should be encrypted
+      chunk->head.flags.body_no_encrypt = 0;
+    } else {
+      chunk->head.flags.body_no_encrypt = 1;
+    }
   }
   chunk->chunk = std::move(buf);
   chunk->chunk_len = len;
+  write_bytes_ += len;
   bool success = co_await WriteEvent(std::move(chunk));
   if (!success) {
     co_return std::make_error_code(std::errc::no_link);

@@ -30,10 +30,11 @@
 #include "snova/io/ws_socket.h"
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include "absl/strings/escaping.h"
-
 #include "asio/experimental/as_tuple.hpp"
+#include "spdlog/fmt/fmt.h"
 
 #include "snova/io/buffered_io.h"
 #include "snova/io/io_util.h"
@@ -43,6 +44,32 @@
 #include "snova/util/misc_helper.h"
 
 namespace snova {
+static constexpr std::string_view kErrorHtml = R"(
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+ <head> 
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" /> 
+  <title>GSnova PAAS Server</title> 
+ </head> 
+ <body> 
+  <div id="container"> 
+   <h1><a href="https://github.com/yinqiwen/snova-asio">Snova-ASIO</a> <span class="small">by <a href="http://twitter.com/yinqiwen">@yinqiwen</a></span></h1> 
+   <div class="description">
+     Welcome to use Snova-ASIO WebSocket Server! 
+   </div> 
+   <h2>Code</h2> 
+   <p>You can clone the project with <a href="http://git-scm.com">Git</a> by running: </p>
+   <pre>$ git clone https://github.com/yinqiwen/snova-asio.git</pre> 
+   <p></p> 
+   <div class="footer">
+     get the source code on GitHub : 
+    <a href="http://github.com/yinqiwen/snova-asio">yinqiwen/snova-asio</a> 
+   </div> 
+  </div>  
+ </body>
+</html>
+)";
+
 WebSocket::WebSocket(IOConnectionPtr&& io) { io_ = std::make_unique<BufferedIO>(std::move(io)); }
 asio::any_io_executor WebSocket::GetExecutor() { return io_->GetExecutor(); }
 asio::awaitable<std::error_code> WebSocket::AsyncConnect(const std::string& host) {
@@ -85,11 +112,16 @@ asio::awaitable<std::error_code> WebSocket::AsyncAccept() {
   }
 
   absl::string_view recv_request(reinterpret_cast<const char*>(recv_buffer->data()), n);
-  SNOVA_INFO("Recv {}", recv_request);
+  // SNOVA_INFO("Recv {}", recv_request);
   absl::string_view sec_ws_key;
   int rc = http_get_header(recv_request, "Sec-WebSocket-Key:", &sec_ws_key);
   if (0 != rc) {
     SNOVA_ERROR("No 'Sec-WebSocket-Key:' found in request:{}", recv_request);
+    std::string res_content =
+        "HTTP/1.0 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length:";
+    res_content.append(std::to_string(kErrorHtml.size())).append("\r\n\r\n");
+    res_content.append(kErrorHtml.data(), kErrorHtml.size());
+    co_await io_->AsyncWrite(::asio::buffer(res_content.data(), res_content.size()));
     co_return std::make_error_code(std::errc::bad_message);
   }
   std::string resp_text_key;

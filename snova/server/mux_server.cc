@@ -154,11 +154,6 @@ asio::awaitable<std::error_code> start_mux_server(const NetAddress& server_addre
   if (!cipher_ctx) {
     co_return std::make_error_code(std::errc::invalid_argument);
   }
-  // PaserAddressResult parse_result = NetAddress::Parse(addr);
-  // if (parse_result.second) {
-  //   co_return parse_result.second;
-  // }
-  // auto server_address = std::move(parse_result.first);
   MuxConnectionType conn_type = MuxConnectionType::MUX_OVER_TCP;
   if (server_address.schema == "ws") {
     conn_type = MuxConnectionType::MUX_OVER_WEBSOCKET;
