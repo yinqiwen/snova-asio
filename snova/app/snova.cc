@@ -163,6 +163,7 @@ int main(int argc, char** argv) {
   }
 
   snova::GlobalFlags::GetIntance()->SetRemoteServer(remote_server);
+  snova::GlobalFlags::GetIntance()->SetUser(auth_user);
   SNOVA_INFO("Snova start to run as {} node.",
              (snova::g_is_entry_node ? "ENTRY" : (snova::g_is_exit_node ? "EXIT" : "MIDDLE")));
   ::asio::io_context ctx;

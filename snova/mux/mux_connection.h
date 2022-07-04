@@ -48,6 +48,11 @@
 // #include "snova/util/async_mutex.h"
 
 namespace snova {
+enum MuxConnectionType {
+  MUX_ENTRY_CONN = 0,
+  MUX_EXIT_CONN,
+};
+
 using ServerAuthResult = std::tuple<std::string, uint64_t, bool>;
 using RelayHandler =
     std::function<asio::awaitable<void>(const std::string&, uint64_t, std::unique_ptr<MuxEvent>&&)>;
@@ -58,11 +63,14 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
  public:
   static size_t Size();
   static size_t ActiveSize();
-  MuxConnection(IOConnectionPtr&& conn, std::unique_ptr<CipherContext>&& cipher_ctx, bool is_local);
+  MuxConnection(MuxConnectionType type, IOConnectionPtr&& conn,
+                std::unique_ptr<CipherContext>&& cipher_ctx, bool is_local);
   asio::awaitable<bool> ClientAuth(const std::string& user, uint64_t client_id);
   asio::awaitable<ServerAuthResult> ServerAuth();
   asio::awaitable<void> ReadEventLoop();
   MuxConnectionPtr GetShared() { return shared_from_this(); }
+
+  MuxConnectionType GetType() const { return type_; }
 
   void SetRelayHandler(RelayHandler&& f) { server_relay_ = std::move(f); }
   void SetRetireCallback(RetireCallback&& f) { retire_callback_ = std::move(f); }
@@ -107,7 +115,7 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
   int ReadEventFromBuffer(std::unique_ptr<MuxEvent>& event, Bytes& buffer);
   asio::awaitable<int> ReadEvent(std::unique_ptr<MuxEvent>& event);
 
-  // ::asio::ip::tcp::socket socket_;
+  MuxConnectionType type_;
   IOConnectionPtr io_conn_;
   std::unique_ptr<CipherContext> cipher_ctx_;
   AsyncChannelMutex write_mutex_;

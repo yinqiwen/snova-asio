@@ -54,10 +54,13 @@ class GlobalFlags {
   const std::string& GetHttpProxyHost();
   void SetRemoteServer(const std::string& s);
   const std::string& GetRemoteServer();
+  void SetUser(const std::string& s);
+  const std::string& GetUser();
 
  private:
   std::string http_proxy_host_;
   std::string remote_server_;
+  std::string user_;
 };
 
 }  // namespace snova

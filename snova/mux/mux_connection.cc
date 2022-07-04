@@ -56,9 +56,10 @@ static uint32_t g_mux_conn_num = 0;
 static uint32_t g_mux_conn_num_in_loop = 0;
 size_t MuxConnection::Size() { return g_mux_conn_num; }
 size_t MuxConnection::ActiveSize() { return g_mux_conn_num_in_loop; }
-MuxConnection::MuxConnection(IOConnectionPtr&& conn, std::unique_ptr<CipherContext>&& cipher_ctx,
-                             bool is_local)
-    : io_conn_(std::move(conn)),
+MuxConnection::MuxConnection(MuxConnectionType type, IOConnectionPtr&& conn,
+                             std::unique_ptr<CipherContext>&& cipher_ctx, bool is_local)
+    : type_(type),
+      io_conn_(std::move(conn)),
       write_mutex_(io_conn_->GetExecutor()),
       cipher_ctx_(std::move(cipher_ctx)),
       client_id_(0),
@@ -140,6 +141,13 @@ asio::awaitable<ServerAuthResult> MuxConnection::ServerAuth() {
       (g_is_middle_node && auth_req_event->flags.is_middle > 0)) {
     SNOVA_ERROR("Invalid client role for current node.");
     co_return ServerAuthResult{"", 0, false};
+  }
+  if (auth_req_event->flags.is_entry) {
+    type_ = MUX_ENTRY_CONN;
+  } else if (auth_req_event->flags.is_exit) {
+    type_ = MUX_EXIT_CONN;
+  } else {
+    type_ = MUX_ENTRY_CONN;
   }
 
   uint64_t iv = random_uint64(0, 102 * 1024 * 1024LL);

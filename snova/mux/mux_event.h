@@ -97,7 +97,7 @@ struct AuthFlags {
   unsigned is_middle : 1;
   unsigned reserved : 6;
   AuthFlags() {
-    is_entry = 1;
+    is_entry = 0;
     is_exit = 0;
     reserved = 0;
   }

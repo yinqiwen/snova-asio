@@ -40,6 +40,7 @@
 namespace snova {
 
 struct RelayContext {
+  std::string user;
   std::string remote_host;
   uint16_t remote_port = 0;
   bool is_tls = false;
