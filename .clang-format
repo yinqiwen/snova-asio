@@ -1,3 +1,4 @@
+---
 Language: Cpp
 BasedOnStyle: Google
 ColumnLimit: 100
@@ -9,8 +10,7 @@ PointerAlignment: Left
 # Only sort headers in each include block
 SortIncludes: true
 IncludeBlocks: Preserve
-
-
 ---
 Language: Proto
 BasedOnStyle: Google
+

@@ -99,10 +99,12 @@ asio::awaitable<std::error_code> MuxStream::Open(const std::string& host, uint16
                                                  bool is_tcp, bool is_tls) {
   std::unique_ptr<StreamOpenRequest> open_request = std::make_unique<StreamOpenRequest>();
   open_request->head.sid = sid_;
-  open_request->remote_host = host;
-  open_request->remote_port = port;
-  open_request->flags.is_tcp = is_tcp ? 1 : 0;
-  open_request->flags.is_tls = is_tls ? 1 : 0;
+  // open_request->remote_host = host;
+  snprintf(open_request->event.remote_host, sizeof(open_request->event.remote_host), "%s",
+           host.c_str());
+  open_request->event.remote_port = port;
+  open_request->event.is_tcp = is_tcp;
+  open_request->event.is_tls = is_tls;
 
   is_tls_ = is_tls;
   bool success = co_await WriteEvent(std::move(open_request));

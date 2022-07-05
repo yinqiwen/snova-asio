@@ -66,19 +66,34 @@ cc_library(
 #     ],
 # )
 
+# cc_test(
+#     name = "mux_event_test",
+#     # size = "small",
+#     srcs = ["mux_event_test.cc"],
+#     copts = SNOVA_DEFAULT_COPTS,
+#     linkopts = SNOVA_DEFAULT_LINKOPTS,
+#     deps = [
+#         ":mux_event",
+#         "@com_google_googletest//:gtest_main",
+#     ],
+# )
+
 cc_library(
     name = "mux_event",
     srcs = [
         "mux_event.cc",
+        "mux_event.pb.c",
     ],
     hdrs = [
         "mux_event.h",
+        "mux_event.pb.h",
     ],
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
         "//snova/io",
         "//snova/log:log_api",
         "//snova/util:endian",
+        "@com_github_nanopb//:nanopb",
     ],
 )
 

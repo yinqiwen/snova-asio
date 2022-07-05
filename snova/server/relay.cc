@@ -171,16 +171,16 @@ asio::awaitable<void> relay_handler(const std::string& auth_user, uint64_t clien
       MuxConnManager::GetInstance()->GetEventWriterFactory(auth_user, client_id, MUX_ENTRY_CONN);
   uint32_t local_stream_id = open_request->head.sid;
   MuxStreamPtr local_stream = MuxStream::New(std::move(factory), ex, client_id, local_stream_id);
-  local_stream->SetTLS(open_request->flags.is_tls);
+  local_stream->SetTLS(open_request->event.is_tls);
   absl::Cleanup auto_remove_local_stream = [client_id, local_stream_id] {
     MuxStream::Remove(client_id, local_stream_id);
   };
   RelayContext relay_ctx;
   relay_ctx.user = auth_user;
-  relay_ctx.remote_host = std::move(open_request->remote_host);
-  relay_ctx.remote_port = open_request->remote_port;
-  relay_ctx.is_tcp = open_request->flags.is_tcp;
-  relay_ctx.is_tls = open_request->flags.is_tls;
+  relay_ctx.remote_host = open_request->event.remote_host;
+  relay_ctx.remote_port = open_request->event.remote_port;
+  relay_ctx.is_tcp = open_request->event.is_tcp;
+  relay_ctx.is_tls = open_request->event.is_tls;
   relay_ctx.direct = false;
   co_await do_relay(local_stream, {}, relay_ctx);
   co_await local_stream->Close(false);

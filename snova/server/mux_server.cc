@@ -99,7 +99,8 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock,
   }
   mux_conn->SetRelayHandler(relay_handler);
   std::string mux_user = std::move(auth_user);
-  SNOVA_INFO("Mux recv user:{} with type:{}", mux_user, mux_conn->GetType());
+  SNOVA_INFO("MuxServer recv connection from user:{} with type:{}, client_id:{}", mux_user,
+             mux_conn->GetType(), client_id);
   mux_conn->SetRetireCallback([mux_user](MuxConnection* c) {
     SNOVA_INFO("[{}]Connection retired!", c->GetIdx());
     MuxConnManager::GetInstance()->Remove(mux_user, c->GetClientId(), c);
@@ -133,7 +134,7 @@ static ::asio::awaitable<void> server_loop(::asio::ip::tcp::acceptor server,
       SNOVA_ERROR("Failed to accept with error:{}", ec.message());
       co_return;
     }
-    SNOVA_INFO("Receive new connection.");
+    // SNOVA_INFO("Receive new connection.");
     auto ex = co_await asio::this_coro::executor;
     ::asio::co_spawn(ex, handle_conn(std::move(client), transport_type, cipher_method, cipher_key),
                      ::asio::detached);

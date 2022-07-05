@@ -136,6 +136,16 @@ cc_library(
             "https://github.com/CLIUtils/CLI11/archive/refs/tags/v2.2.0.tar.gz",
         ],
     )
+    nanopb_ver = kwargs.get("nanopb_ver", "0.4.6.4")
+    nanopb_name = "nanopb-{ver}".format(ver = nanopb_ver)
+    http_archive(
+        name = "com_github_nanopb",
+        strip_prefix = nanopb_name,
+        build_file = clean_dep("//:bazel/nanopb.BUILD"),
+        urls = [
+            "https://github.com/nanopb/nanopb/archive/refs/tags/{ver}.tar.gz".format(ver = nanopb_ver),
+        ],
+    )
 
     native.new_local_repository(
         name = "local_armv5l_linux_musleabi",

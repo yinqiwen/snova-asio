@@ -16,6 +16,8 @@ SNOVA_DEFAULT_COPTS = select({
         "/wd4267",
         "/wd4503",
         "/wd4800",
+        # used for nanopb
+        "/DPB_C99_STATIC_ASSERT",
     ],
     "//conditions:default": [
         # "-std=c++20",
