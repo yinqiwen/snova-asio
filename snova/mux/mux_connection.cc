@@ -56,9 +56,10 @@ static uint32_t g_mux_conn_num = 0;
 static uint32_t g_mux_conn_num_in_loop = 0;
 size_t MuxConnection::Size() { return g_mux_conn_num; }
 size_t MuxConnection::ActiveSize() { return g_mux_conn_num_in_loop; }
-MuxConnection::MuxConnection(IOConnectionPtr&& conn, std::unique_ptr<CipherContext>&& cipher_ctx,
-                             bool is_local)
-    : io_conn_(std::move(conn)),
+MuxConnection::MuxConnection(MuxConnectionType type, IOConnectionPtr&& conn,
+                             std::unique_ptr<CipherContext>&& cipher_ctx, bool is_local)
+    : type_(type),
+      io_conn_(std::move(conn)),
       write_mutex_(io_conn_->GetExecutor()),
       cipher_ctx_(std::move(cipher_ctx)),
       client_id_(0),
@@ -135,19 +136,31 @@ asio::awaitable<ServerAuthResult> MuxConnection::ServerAuth() {
     SNOVA_ERROR("Recv non auth reqeust with type:{}", auth_req->head.type);
     co_return ServerAuthResult{"", 0, false};
   }
+  if ((g_is_entry_node && auth_req_event->event.is_entry > 0) ||
+      (g_is_exit_node && auth_req_event->event.is_exit > 0) ||
+      (g_is_middle_node && auth_req_event->event.is_middle > 0)) {
+    SNOVA_ERROR("Invalid client role for current node.");
+    co_return ServerAuthResult{"", 0, false};
+  }
+  if (auth_req_event->event.is_entry) {
+    type_ = MUX_ENTRY_CONN;
+  } else if (auth_req_event->event.is_exit) {
+    type_ = MUX_EXIT_CONN;
+  } else {
+    type_ = MUX_ENTRY_CONN;
+  }
+
   uint64_t iv = random_uint64(0, 102 * 1024 * 1024LL);
-  // absl::BitGen bitgen;
-  // uint64_t iv = absl::Uniform(bitgen, 0, 102 * 1024 * 1024LL);
   std::unique_ptr<AuthResponse> auth_res = std::make_unique<AuthResponse>();
-  auth_res->success = true;
-  auth_res->iv = iv;
+  auth_res->event.success = true;
+  auth_res->event.iv = iv;
   bool write_success = co_await WriteEvent(std::move(auth_res));
   if (write_success) {
     cipher_ctx_->UpdateNonce(iv);
   }
-  client_id_ = auth_req_event->client_id;
-  auth_user_ = auth_req_event->user;
-  co_return ServerAuthResult{auth_req_event->user, auth_req_event->client_id, write_success};
+  client_id_ = auth_req_event->event.client_id;
+  auth_user_ = auth_req_event->event.user;
+  co_return ServerAuthResult{auth_user_, auth_req_event->event.client_id, write_success};
 }
 
 asio::awaitable<bool> MuxConnection::ClientAuth(const std::string& user, uint64_t client_id) {
@@ -157,8 +170,18 @@ asio::awaitable<bool> MuxConnection::ClientAuth(const std::string& user, uint64_
   }
   client_id_ = client_id;
   std::unique_ptr<AuthRequest> auth = std::make_unique<AuthRequest>();
-  auth->user = user;
-  auth->client_id = client_id;
+  snprintf(auth->event.user, sizeof(auth->event.user), "%s", user.c_str());
+  // auth->user = user;
+  auth->event.client_id = client_id;
+  if (g_is_entry_node) {
+    auth->event.is_entry = 1;
+  }
+  if (g_is_exit_node) {
+    auth->event.is_exit = 1;
+  }
+  if (g_is_middle_node) {
+    auth->event.is_middle = 1;
+  }
   bool write_success = co_await WriteEvent(std::move(auth));
   if (!write_success) {
     SNOVA_ERROR("Write auth request failed.");
@@ -177,11 +200,11 @@ asio::awaitable<bool> MuxConnection::ClientAuth(const std::string& user, uint64_
     SNOVA_ERROR("Recv non auth response with type:{}", auth_res->head.type);
     co_return false;
   }
-  bool success = auth_res_event->success;
+  bool success = auth_res_event->event.success;
   if (!success) {
     SNOVA_ERROR("Recv error auth response.");
   } else {
-    cipher_ctx_->UpdateNonce(auth_res_event->iv);
+    cipher_ctx_->UpdateNonce(auth_res_event->event.iv);
     is_authed_ = true;
     // SNOVA_INFO("Success to recv auth response.");
   }

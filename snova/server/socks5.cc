@@ -33,6 +33,7 @@
 #include "snova/log/log_macros.h"
 #include "snova/server/entry_server.h"
 #include "snova/server/relay.h"
+#include "snova/util/flags.h"
 
 namespace snova {
 static constexpr uint8_t kMethodNoAuth = 0;
@@ -156,6 +157,7 @@ asio::awaitable<void> handle_socks5_connection(::asio::ip::tcp::socket&& s, IOBu
   }
 
   RelayContext relay_ctx;
+  relay_ctx.user = GlobalFlags::GetIntance()->GetUser();
   relay_ctx.remote_host = std::move(remote_host);
   relay_ctx.remote_port = remote_port;
   relay_ctx.is_tcp = true;

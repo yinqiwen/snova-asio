@@ -49,7 +49,7 @@ class MuxClient {
  private:
   asio::awaitable<std::error_code> NewConnection(uint32_t idx);
   asio::awaitable<void> CheckConnections();
-
+  MuxConnectionType conn_type_ = MUX_EXIT_CONN;
   MuxSessionPtr remote_session_;
   // std::vector<MuxConnectionPtr> remote_conns_;
   std::unique_ptr<NetAddress> remote_mux_address_;

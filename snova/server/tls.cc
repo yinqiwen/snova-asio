@@ -29,6 +29,7 @@
 #include "snova/log/log_macros.h"
 #include "snova/server/entry_server.h"
 #include "snova/server/relay.h"
+#include "snova/util/flags.h"
 #include "snova/util/sni.h"
 
 namespace snova {
@@ -59,6 +60,7 @@ asio::awaitable<bool> handle_tls_connection(
     // }
   }
   RelayContext relay_ctx;
+  relay_ctx.user = GlobalFlags::GetIntance()->GetUser();
   relay_ctx.remote_host = std::move(remote_host);
   relay_ctx.remote_port = remote_port;
   relay_ctx.is_tcp = true;

@@ -41,6 +41,8 @@
 #include "spdlog/fmt/fmt.h"
 
 namespace snova {
+asio::awaitable<void> relay_handler(const std::string& user, uint64_t client_id,
+                                    std::unique_ptr<MuxEvent>&& open_request);
 std::shared_ptr<MuxClient>& MuxClient::GetInstance() {
   static std::shared_ptr<MuxClient> g_instance = std::make_shared<MuxClient>();
   return g_instance;
@@ -98,14 +100,17 @@ asio::awaitable<std::error_code> MuxClient::NewConnection(uint32_t idx) {
   }
 
   std::unique_ptr<CipherContext> cipher_ctx = CipherContext::New(cipher_method_, cipher_key_);
-
   MuxConnectionPtr conn =
-      std::make_shared<MuxConnection>(std::move(io_conn), std::move(cipher_ctx), true);
+      std::make_shared<MuxConnection>(conn_type_, std::move(io_conn), std::move(cipher_ctx), true);
   bool auth_success = co_await conn->ClientAuth(auth_user_, client_id_);
   if (!auth_success) {
     co_return std::make_error_code(std::errc::invalid_argument);
   }
   conn->SetIdx(idx);
+  if (g_is_exit_node) {
+    conn->SetRelayHandler(relay_handler);
+  }
+
   SNOVA_INFO("[{}]Success to connect:{}", idx, remote_mux_address_->String());
   ::asio::co_spawn(
       ex,
@@ -123,8 +128,15 @@ asio::awaitable<std::error_code> MuxClient::NewConnection(uint32_t idx) {
 asio::awaitable<std::error_code> MuxClient::Init(const std::string& user,
                                                  const std::string& cipher_method,
                                                  const std::string& cipher_key) {
-  // remote_conns_.resize(g_conn_num_per_server);
-  remote_session_ = MuxConnManager::GetInstance()->GetSession(auth_user_, client_id_);
+  auth_user_ = user;
+  if (g_is_exit_node) {
+    conn_type_ = MUX_ENTRY_CONN;
+  } else if (g_is_middle_node) {
+    conn_type_ = MUX_EXIT_CONN;
+  } else {
+    conn_type_ = MUX_EXIT_CONN;
+  }
+  remote_session_ = MuxConnManager::GetInstance()->GetSession(auth_user_, client_id_, conn_type_);
   remote_session_->conns.resize(g_conn_num_per_server);
   PaserAddressResult parse_result = NetAddress::Parse(GlobalFlags::GetIntance()->GetRemoteServer());
   if (parse_result.second) {

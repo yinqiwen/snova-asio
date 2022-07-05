@@ -32,7 +32,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/log/log_macros.h"
-#include "spdlog/fmt/bundled/ostream.h"
+#include "snova/util/flags.h"
 namespace snova {
 
 struct ClientStreamID {
@@ -85,6 +85,7 @@ MuxStream::MuxStream(EventWriterFactory&& factory, const StreamDataChannelExecut
                      uint64_t client_id, uint32_t sid)
     : event_writer_factory_(std::move(factory)),
       data_channel_(ex, 1),
+      write_bytes_(0),
       client_id_(client_id),
       sid_(sid),
       is_tls_(false),
@@ -98,10 +99,12 @@ asio::awaitable<std::error_code> MuxStream::Open(const std::string& host, uint16
                                                  bool is_tcp, bool is_tls) {
   std::unique_ptr<StreamOpenRequest> open_request = std::make_unique<StreamOpenRequest>();
   open_request->head.sid = sid_;
-  open_request->remote_host = host;
-  open_request->remote_port = port;
-  open_request->flags.is_tcp = is_tcp ? 1 : 0;
-  open_request->flags.is_tls = is_tls ? 1 : 0;
+  // open_request->remote_host = host;
+  snprintf(open_request->event.remote_host, sizeof(open_request->event.remote_host), "%s",
+           host.c_str());
+  open_request->event.remote_port = port;
+  open_request->event.is_tcp = is_tcp;
+  open_request->event.is_tls = is_tls;
 
   is_tls_ = is_tls;
   bool success = co_await WriteEvent(std::move(open_request));
@@ -140,10 +143,16 @@ asio::awaitable<std::error_code> MuxStream::Write(IOBufPtr&& buf, size_t len) {
   auto chunk = std::make_unique<StreamChunk>();
   chunk->head.sid = sid_;
   if (is_tls_) {
-    chunk->head.flags.body_no_encrypt = 1;
+    if (write_bytes_ == 0 && g_is_entry_node) {
+      // first chunk contains client_hello which should be encrypted
+      chunk->head.flags.body_no_encrypt = 0;
+    } else {
+      chunk->head.flags.body_no_encrypt = 1;
+    }
   }
   chunk->chunk = std::move(buf);
   chunk->chunk_len = len;
+  write_bytes_ += len;
   bool success = co_await WriteEvent(std::move(chunk));
   if (!success) {
     co_return std::make_error_code(std::errc::no_link);

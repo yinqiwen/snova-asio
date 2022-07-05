@@ -38,16 +38,18 @@
 #include "snova/mux/mux_connection.h"
 #include "snova/util/stat.h"
 namespace snova {
+
 struct MuxSession : public std::enable_shared_from_this<MuxSession> {
   using MuxConnArray = std::vector<MuxConnectionPtr>;
   MuxConnArray conns;
   EventWriterFactory GetEventWriterFactory();
+  void ReportStatInfo(StatKeyValue& kv);
 };
 using MuxSessionPtr = std::shared_ptr<MuxSession>;
 struct UserMuxConn {
   using MuxConnTable = absl::flat_hash_map<uint64_t, MuxSessionPtr>;
   std::string user;
-  MuxConnTable sessions;
+  MuxConnTable sessions[2];  // 0:entry 1:exit
 };
 
 using UserMuxConnPtr = std::shared_ptr<UserMuxConn>;
@@ -58,12 +60,14 @@ class MuxConnManager {
 
   void RegisterStat();
 
-  MuxSessionPtr GetSession(std::string_view user, uint64_t client_id);
+  MuxSessionPtr GetSession(std::string_view user, uint64_t client_id, MuxConnectionType type);
   uint32_t Add(std::string_view user, uint64_t client_id, MuxConnectionPtr conn);
   void Remove(std::string_view user, uint64_t client_id, MuxConnectionPtr conn);
   void Remove(std::string_view user, uint64_t client_id, MuxConnection* conn);
 
-  EventWriterFactory GetEventWriterFactory(std::string_view user, uint64_t client_id);
+  EventWriterFactory GetEventWriterFactory(std::string_view user, uint64_t client_id,
+                                           MuxConnectionType type);
+  EventWriterFactory GetRelayEventWriterFactory(std::string_view user, uint64_t* client_id);
 
  private:
   void ReportStatInfo(StatValues& stats);

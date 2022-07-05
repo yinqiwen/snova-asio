@@ -55,5 +55,7 @@ void GlobalFlags::SetHttpProxyHost(const std::string& s) { http_proxy_host_ = s;
 const std::string& GlobalFlags::GetHttpProxyHost() { return http_proxy_host_; }
 void GlobalFlags::SetRemoteServer(const std::string& s) { remote_server_ = s; }
 const std::string& GlobalFlags::GetRemoteServer() { return remote_server_; }
+void GlobalFlags::SetUser(const std::string& s) { user_ = s; }
+const std::string& GlobalFlags::GetUser() { return user_; }
 
 }  // namespace snova

@@ -26,34 +26,32 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#pragma once
-
-#include <memory>
-#include <string>
-#include <string_view>
-#include "asio.hpp"
-#include "snova/io/io.h"
 #include "snova/mux/mux_event.h"
-#include "snova/mux/mux_stream.h"
+#include <gtest/gtest.h>
+#include <utility>
+#include "pb_decode.h"
+#include "pb_encode.h"
+#include "snova/log/log_macros.h"
+using namespace snova;  // NOLINT
 
-namespace snova {
+TEST(MuxEvent, nanopb) {
+  snova_AuthRequest message = snova_AuthRequest_init_default;
+  message.client_id = 121;
+  snprintf(message.user, sizeof(message.user), "%s", "jeeeeee");
 
-struct RelayContext {
-  std::string user;
-  std::string remote_host;
-  uint16_t remote_port = 0;
-  bool is_tls = false;
-  bool is_tcp = false;
-  bool direct = false;
-};
+  unsigned char buf[256];
+  pb_ostream_t output = pb_ostream_from_buffer(buf, sizeof(buf));
+  if (!pb_encode_delimited(&output, snova_AuthRequest_fields, &message)) {
+    printf("Encoding failed: %s\n", PB_GET_ERROR(&output));
+    return;
+  }
+  size_t n = output.bytes_written;
 
-asio::awaitable<void> relay_direct(::asio::ip::tcp::socket&& sock, const Bytes& readed_data,
-                                   RelayContext& relay_ctx);
-asio::awaitable<void> relay(::asio::ip::tcp::socket&& sock, const Bytes& readed_data,
-                            RelayContext& relay_ctx);
-asio::awaitable<void> relay(StreamPtr stream, const Bytes& readed_data, RelayContext& relay_ctx);
-
-asio::awaitable<void> relay_handler(const std::string& user, uint64_t client_id,
-                                    std::unique_ptr<MuxEvent>&& open_request);
-}  // namespace snova
+  snova_AuthRequest decode_msg = snova_AuthRequest_init_default;
+  pb_istream_t input = pb_istream_from_buffer(buf, n);
+  if (!pb_decode_delimited(&input, snova_AuthRequest_fields, &decode_msg)) {
+    printf("Decode failed: %s\n", PB_GET_ERROR(&input));
+    return;
+  }
+  printf("%s %llu %d\n", decode_msg.user, decode_msg.client_id, input.bytes_left);
+}

@@ -30,7 +30,28 @@
 #include <utility>
 #include "snova/util/flags.h"
 namespace snova {
-
+void MuxSession::ReportStatInfo(StatKeyValue& kv) {
+  uint32_t now = time(nullptr);
+  for (size_t i = 0; i < conns.size(); i++) {
+    auto& conn = conns[i];
+    if (!conn) {
+      kv[fmt::format("[{}]", i)] = "NULL";
+    } else {
+      // kv[fmt::format("[{}]read_state", i)] = conn->GetReadState();
+      auto inactive_secs = now - conn->GetLastActiveUnixSecs();
+      kv[fmt::format("[{}]inactive_secs", i)] = std::to_string(inactive_secs);
+      kv[fmt::format("[{}]recv_bytes", i)] = std::to_string(conn->GetRecvBytes());
+      kv[fmt::format("[{}]send_bytes", i)] = std::to_string(conn->GetSendBytes());
+      kv[fmt::format("[{}]latest_30s_recv_bytes", i)] =
+          std::to_string(conn->GetLatestWindowRecvBytes());
+      kv[fmt::format("[{}]latest_30s_send_bytes", i)] =
+          std::to_string(conn->GetLatestWindowSendBytes());
+      if (inactive_secs > g_connection_max_inactive_secs) {
+        conn->Close();
+      }
+    }
+  }
+}
 EventWriterFactory MuxSession::GetEventWriterFactory() {
   MuxSessionPtr session = shared_from_this();
   EventWriterFactory f = [session]() mutable -> EventWriter {
@@ -86,43 +107,49 @@ void MuxConnManager::RegisterStat() {
 }
 
 void MuxConnManager::ReportStatInfo(StatValues& stats) {
-  uint32_t now = time(nullptr);
   for (const auto& [user, user_conn] : mux_conns_) {
-    for (const auto& [client_id, session] : user_conn->sessions) {
-      auto& kv = stats[fmt::format("MuxConnection:{}:{}", user, client_id)];
-      for (size_t i = 0; i < session->conns.size(); i++) {
-        auto& conn = session->conns[i];
-        if (!conn) {
-          kv[fmt::format("[{}]", i)] = "NULL";
-        } else {
-          // kv[fmt::format("[{}]read_state", i)] = conn->GetReadState();
-          auto inactive_secs = now - conn->GetLastActiveUnixSecs();
-          kv[fmt::format("[{}]inactive_secs", i)] = std::to_string(inactive_secs);
-          kv[fmt::format("[{}]recv_bytes", i)] = std::to_string(conn->GetRecvBytes());
-          kv[fmt::format("[{}]send_bytes", i)] = std::to_string(conn->GetSendBytes());
-          kv[fmt::format("[{}]latest_30s_recv_bytes", i)] =
-              std::to_string(conn->GetLatestWindowRecvBytes());
-          kv[fmt::format("[{}]latest_30s_send_bytes", i)] =
-              std::to_string(conn->GetLatestWindowSendBytes());
-
-          if (inactive_secs > g_connection_max_inactive_secs) {
-            conn->Close();
-          }
-        }
+    for (size_t i = 0; i < 3; i++) {
+      auto& session_table = user_conn->sessions[i];
+      if (session_table.empty()) {
+        continue;
+      }
+      std::string_view type = (i == 0 ? "ENTRY" : (i == 1 ? "EXIT" : "MIDDLE"));
+      for (const auto& [client_id, session] : session_table) {
+        auto& kv = stats[fmt::format("[{}]MuxConnection:{}:{}", type, user, client_id)];
+        session->ReportStatInfo(kv);
       }
     }
   }
 }
-
-EventWriterFactory MuxConnManager::GetEventWriterFactory(std::string_view user,
-                                                         uint64_t client_id) {
+EventWriterFactory MuxConnManager::GetRelayEventWriterFactory(std::string_view user,
+                                                              uint64_t* client_id) {
   auto user_found = mux_conns_.find(user);
   if (user_found == mux_conns_.end()) {
     return {};
   }
   UserMuxConnPtr user_conn = user_found->second;
-  auto found = user_conn->sessions.find(client_id);
-  if (found == user_conn->sessions.end()) {
+  auto& exit_session_table = user_conn->sessions[MUX_EXIT_CONN];
+  for (auto& [cid, session] : exit_session_table) {
+    if (session->conns.size() == 0) {
+      continue;
+    }
+    if (nullptr != client_id) {
+      *client_id = cid;
+    }
+    return session->GetEventWriterFactory();
+  }
+  return {};
+}
+
+EventWriterFactory MuxConnManager::GetEventWriterFactory(std::string_view user, uint64_t client_id,
+                                                         MuxConnectionType type) {
+  auto user_found = mux_conns_.find(user);
+  if (user_found == mux_conns_.end()) {
+    return {};
+  }
+  UserMuxConnPtr user_conn = user_found->second;
+  auto found = user_conn->sessions[type].find(client_id);
+  if (found == user_conn->sessions[type].end()) {
     return {};
   }
   return found->second->GetEventWriterFactory();
@@ -142,9 +169,10 @@ UserMuxConnPtr MuxConnManager::GetUserMuxConn(std::string_view user) {
   return user_conn;
 }
 
-MuxSessionPtr MuxConnManager::GetSession(std::string_view user, uint64_t client_id) {
+MuxSessionPtr MuxConnManager::GetSession(std::string_view user, uint64_t client_id,
+                                         MuxConnectionType type) {
   UserMuxConnPtr user_conn = GetUserMuxConn(user);
-  MuxSessionPtr& session = user_conn->sessions[client_id];
+  MuxSessionPtr& session = user_conn->sessions[type][client_id];
   if (!session) {
     session = std::make_shared<MuxSession>();
   }
@@ -153,7 +181,7 @@ MuxSessionPtr MuxConnManager::GetSession(std::string_view user, uint64_t client_
 
 uint32_t MuxConnManager::Add(std::string_view user, uint64_t client_id, MuxConnectionPtr conn) {
   UserMuxConnPtr user_conn = GetUserMuxConn(user);
-  MuxSessionPtr& session = user_conn->sessions[client_id];
+  MuxSessionPtr& session = user_conn->sessions[conn->GetType()][client_id];
   if (!session) {
     session = std::make_shared<MuxSession>();
   }
@@ -174,8 +202,8 @@ void MuxConnManager::Remove(std::string_view user, uint64_t client_id, MuxConnec
     return;
   }
 
-  auto found = user_found->second->sessions.find(client_id);
-  if (found == user_found->second->sessions.end()) {
+  auto found = user_found->second->sessions[conn->GetType()].find(client_id);
+  if (found == user_found->second->sessions[conn->GetType()].end()) {
     return;
   }
   bool all_empty = true;
@@ -194,7 +222,7 @@ void MuxConnManager::Remove(std::string_view user, uint64_t client_id, MuxConnec
     }
   }
   if (all_empty) {
-    user_found->second->sessions.erase(found);
+    user_found->second->sessions[conn->GetType()].erase(found);
   }
 }
 void MuxConnManager::Remove(std::string_view user, uint64_t client_id, MuxConnectionPtr conn) {

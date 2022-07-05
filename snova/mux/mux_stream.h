@@ -86,6 +86,7 @@ class MuxStream : public Stream {
   EventWriterFactory event_writer_factory_;
   EventWriter event_writer_;
   StreamDataChannel data_channel_;
+  size_t write_bytes_;
   uint64_t client_id_;
   uint32_t sid_;
   bool is_tls_;

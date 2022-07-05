@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package snova;
+
+message AuthRequest {
+  string user = 1;
+  uint64 client_id = 2;
+  bool is_entry = 3;
+  bool is_exit = 4;
+  bool is_middle = 5;
+}
+
+message AuthResponse {
+  bool success = 1;
+  uint64 iv = 2;
+}
+
+message StreamOpenRequest {
+  string remote_host = 1;
+  uint32 remote_port = 2;
+  bool is_tcp = 3;
+  bool is_tls = 4;
+}

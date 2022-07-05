@@ -50,7 +50,7 @@
 #include "snova/util/time_wheel.h"
 
 namespace snova {
-enum class MuxConnectionType : uint8_t {
+enum class MuxTransportType : uint8_t {
   MUX_OVER_TCP = 0,
   MUX_OVER_WEBSOCKET,
   MUX_OVER_TLS,
@@ -59,7 +59,7 @@ enum class MuxConnectionType : uint8_t {
 static uint32_t g_mux_server_conn_num = 0;
 
 static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock,
-                                           MuxConnectionType conn_type,
+                                           MuxTransportType transport_type,
                                            const std::string& cipher_method,
                                            const std::string& cipher_key) {
   g_mux_server_conn_num++;
@@ -67,12 +67,12 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock,
   std::unique_ptr<CipherContext> cipher_ctx = CipherContext::New(cipher_method, cipher_key);
   IOConnectionPtr io_conn;
 
-  switch (conn_type) {
-    case MuxConnectionType::MUX_OVER_TCP: {
+  switch (transport_type) {
+    case MuxTransportType::MUX_OVER_TCP: {
       io_conn = std::make_unique<TcpSocket>(std::move(sock));
       break;
     }
-    case MuxConnectionType::MUX_OVER_WEBSOCKET: {
+    case MuxTransportType::MUX_OVER_WEBSOCKET: {
       IOConnectionPtr tcp_conn = std::make_unique<TcpSocket>(std::move(sock));
       auto ws_conn = std::make_unique<WebSocket>(std::move(tcp_conn));
       auto ec = co_await ws_conn->AsyncAccept();
@@ -84,13 +84,14 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock,
       break;
     }
     default: {
-      SNOVA_ERROR("Unsupported connection type:{}", static_cast<uint8_t>(conn_type));
+      SNOVA_ERROR("Unsupported connection type:{}", static_cast<uint8_t>(transport_type));
       co_return;
     }
   }
 
-  MuxConnectionPtr mux_conn =
-      std::make_shared<MuxConnection>(std::move(io_conn), std::move(cipher_ctx), false);
+  // rewrite conn type by later 'ServerAuth'
+  MuxConnectionPtr mux_conn = std::make_shared<MuxConnection>(MUX_ENTRY_CONN, std::move(io_conn),
+                                                              std::move(cipher_ctx), false);
   auto [auth_user, client_id, auth_success] = co_await mux_conn->ServerAuth();
   if (!auth_success) {
     SNOVA_ERROR("Server auth failed!");
@@ -98,6 +99,8 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock,
   }
   mux_conn->SetRelayHandler(relay_handler);
   std::string mux_user = std::move(auth_user);
+  SNOVA_INFO("MuxServer recv connection from user:{} with type:{}, client_id:{}", mux_user,
+             mux_conn->GetType(), client_id);
   mux_conn->SetRetireCallback([mux_user](MuxConnection* c) {
     SNOVA_INFO("[{}]Connection retired!", c->GetIdx());
     MuxConnManager::GetInstance()->Remove(mux_user, c->GetClientId(), c);
@@ -121,7 +124,7 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock,
 }
 
 static ::asio::awaitable<void> server_loop(::asio::ip::tcp::acceptor server,
-                                           MuxConnectionType conn_type,
+                                           MuxTransportType transport_type,
                                            const std::string& cipher_method,
                                            const std::string& cipher_key) {
   while (true) {
@@ -131,9 +134,9 @@ static ::asio::awaitable<void> server_loop(::asio::ip::tcp::acceptor server,
       SNOVA_ERROR("Failed to accept with error:{}", ec.message());
       co_return;
     }
-    SNOVA_INFO("Receive new connection.");
+    // SNOVA_INFO("Receive new connection.");
     auto ex = co_await asio::this_coro::executor;
-    ::asio::co_spawn(ex, handle_conn(std::move(client), conn_type, cipher_method, cipher_key),
+    ::asio::co_spawn(ex, handle_conn(std::move(client), transport_type, cipher_method, cipher_key),
                      ::asio::detached);
   }
   co_return;
@@ -154,14 +157,9 @@ asio::awaitable<std::error_code> start_mux_server(const NetAddress& server_addre
   if (!cipher_ctx) {
     co_return std::make_error_code(std::errc::invalid_argument);
   }
-  // PaserAddressResult parse_result = NetAddress::Parse(addr);
-  // if (parse_result.second) {
-  //   co_return parse_result.second;
-  // }
-  // auto server_address = std::move(parse_result.first);
-  MuxConnectionType conn_type = MuxConnectionType::MUX_OVER_TCP;
+  MuxTransportType transport_type = MuxTransportType::MUX_OVER_TCP;
   if (server_address.schema == "ws") {
-    conn_type = MuxConnectionType::MUX_OVER_WEBSOCKET;
+    transport_type = MuxTransportType::MUX_OVER_WEBSOCKET;
   }
 
   auto ex = co_await asio::this_coro::executor;
@@ -185,7 +183,7 @@ asio::awaitable<std::error_code> start_mux_server(const NetAddress& server_addre
     co_return ec;
   }
 
-  ::asio::co_spawn(ex, server_loop(std::move(acceptor), conn_type, cipher_method, cipher_key),
+  ::asio::co_spawn(ex, server_loop(std::move(acceptor), transport_type, cipher_method, cipher_key),
                    ::asio::detached);
   co_return ec;
 }

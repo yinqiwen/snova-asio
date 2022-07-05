@@ -34,6 +34,7 @@
 #include <string>
 #include "asio/experimental/channel.hpp"
 #include "snova/io/io.h"
+#include "snova/mux/mux_event.pb.h"
 
 #define ERR_NEED_MORE_INPUT_DATA -1000
 #define ERR_NEED_MORE_OUTPUT_BUFFER -1001
@@ -42,6 +43,8 @@
 #define ERR_TOO_LARGE_EVENT_DECODE_LENGTH -1004
 #define ERR_READ_EOF -1005
 #define ERR_TOO_SMALL_EVENT_DECODE_CONTENT -1006
+#define ERR_PB_ENCODE -1007
+#define ERR_PB_DECODE -1008
 
 namespace snova {
 static constexpr uint16_t kEventHeadSize = 8;
@@ -71,7 +74,6 @@ enum EventType {
   EVENT_STREAM_CLOSE,
   EVENT_STREAM_CHUNK,
   EVENT_RETIRE_CONN_REQ,
-  // EVENT_RETIRE_CONN_RES,
 };
 
 struct MuxEvent {
@@ -83,24 +85,33 @@ struct MuxEvent {
   virtual ~MuxEvent() {}
 };
 
-// using EventChannel =
-//     asio::experimental::channel<void(std::error_code, std::unique_ptr<MuxEvent>&&)>;
-// using EventChannelPtr = std::shared_ptr<EventChannel>;
-// using EventChannelGetter = std::function<EventChannelPtr()>;
-
 using EventWriter = std::function<asio::awaitable<bool>(std::unique_ptr<MuxEvent>&&)>;
 using EventWriterFactory = std::function<EventWriter()>;
 
+// struct AuthFlags {
+//   unsigned is_entry : 1;
+//   unsigned is_exit : 1;
+//   unsigned is_middle : 1;
+//   unsigned reserved : 6;
+//   AuthFlags() {
+//     is_entry = 0;
+//     is_exit = 0;
+//     reserved = 0;
+//   }
+// };
 struct AuthRequest : public MuxEvent {
-  std::string user;
-  uint64_t client_id = 0;
+  snova_AuthRequest event = snova_AuthRequest_init_default;
+  // std::string user;
+  // uint64_t client_id = 0;
+  // AuthFlags flags;
   AuthRequest() { head.type = EVENT_AUTH_REQ; }
   int Encode(MutableBytes& buffer) const override;
   int Decode(const Bytes& buffer) override;
 };
 struct AuthResponse : public MuxEvent {
-  bool success;
-  uint64_t iv = 0;
+  snova_AuthResponse event = snova_AuthResponse_init_default;
+  // bool success;
+  // uint64_t iv = 0;
   AuthResponse() { head.type = EVENT_AUTH_RES; }
   int Encode(MutableBytes& buffer) const override;
   int Decode(const Bytes& buffer) override;
@@ -112,21 +123,22 @@ struct RetireConnRequest : public MuxEvent {
   int Decode(const Bytes& buffer) override;
 };
 
-struct StreamOpenFlags {
-  unsigned is_tcp : 1;
-  unsigned is_tls : 1;
-  unsigned reserved : 6;
-  StreamOpenFlags() {
-    is_tcp = 1;
-    is_tls = 0;
-    reserved = 0;
-  }
-};
+// struct StreamOpenFlags {
+//   unsigned is_tcp : 1;
+//   unsigned is_tls : 1;
+//   unsigned reserved : 6;
+//   StreamOpenFlags() {
+//     is_tcp = 1;
+//     is_tls = 0;
+//     reserved = 0;
+//   }
+// };
 
 struct StreamOpenRequest : public MuxEvent {
-  std::string remote_host;
-  uint16_t remote_port = 0;
-  StreamOpenFlags flags;
+  snova_StreamOpenRequest event = snova_StreamOpenRequest_init_default;
+  // std::string remote_host;
+  // uint16_t remote_port = 0;
+  // StreamOpenFlags flags;
   StreamOpenRequest() { head.type = EVENT_STREAM_OPEN; }
   int Encode(MutableBytes& buffer) const override;
   int Decode(const Bytes& buffer) override;
