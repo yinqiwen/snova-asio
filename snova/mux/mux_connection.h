@@ -45,7 +45,6 @@
 #include "snova/mux/cipher_context.h"
 #include "snova/mux/mux_stream.h"
 #include "snova/util/async_channel_mutex.h"
-// #include "snova/util/async_mutex.h"
 
 namespace snova {
 enum MuxConnectionType {
@@ -67,6 +66,9 @@ class MuxConnection : public std::enable_shared_from_this<MuxConnection> {
                 std::unique_ptr<CipherContext>&& cipher_ctx, bool is_local);
   asio::awaitable<bool> ClientAuth(const std::string& user, uint64_t client_id);
   asio::awaitable<ServerAuthResult> ServerAuth();
+  asio::awaitable<bool> OpenTunnel(uint16_t remote_port, const std::string& local_host,
+                                   uint16_t local_port, bool is_tcp, bool is_udp);
+
   asio::awaitable<void> ReadEventLoop();
   MuxConnectionPtr GetShared() { return shared_from_this(); }
 

@@ -18,6 +18,7 @@ SNOVA_DEFAULT_COPTS = select({
         "/wd4800",
         # used for nanopb
         "/DPB_C99_STATIC_ASSERT",
+        "/Gy",
     ],
     "//conditions:default": [
         # "-std=c++20",
@@ -26,13 +27,19 @@ SNOVA_DEFAULT_COPTS = select({
         # "-DASIO_HAS_IO_URING",
         # "-DASIO_DISABLE_EPOLL",
         "-O3",
+        "-fvisibility=hidden",
+        "-ffunction-sections",
+        "-fdata-sections",
         # "-g",
     ],
 })
 
-SNOVA_DEFAULT_LINKOPTS = [
-    # "-lpthread",
-    # "-static-libstdc++",
-    # "-static-libgcc",
-    # "-l:libstdc++.a",
-]
+SNOVA_DEFAULT_LINKOPTS = select({
+    "@bazel_tools//src/conditions:windows": [
+        "/OPT:REF",
+    ],
+    "@bazel_tools//src/conditions:darwin": ["-dead_strip"],
+    "//conditions:default": [
+        "-Wl,--gc-sections,-s",
+    ],
+})

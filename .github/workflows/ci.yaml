@@ -11,90 +11,46 @@ on:
   pull_request:
     types: [ assigned, opened, synchronize, reopened, labeled ]
 jobs:
-  linux_build:
-    runs-on: ubuntu-latest
+  ci_matrix:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        # cpu: [amd64]
+        cpu: [amd64, arm_eabi, arm_eabihf, aarch64]
+        exclude:
+          - os: windows-latest
+            cpu: arm_eabi
+          - os: windows-latest
+            cpu: arm_eabihf
+          - os: windows-latest
+            cpu: aarch64
+          - os: macos-latest
+            cpu: arm_eabi
+          - os: macos-latest
+            cpu: arm_eabihf
+          - os: macos-latest
+            cpu: aarch64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
       - name: Get the tag version
         id: get_version
         if: startsWith(github.ref, 'refs/tags/')
         run: echo BUILD_VERSION="$(echo "${GITHUB_REF}" | cut -d / -f 3)" >> "$GITHUB_ENV"
+        shell: bash
       - name: Get the commit version
         if: startsWith(github.ref, 'refs/tags/') != true
         run: echo BUILD_VERSION="${GITHUB_SHA}" >> "$GITHUB_ENV"
+        shell: bash
       - uses: bazelbuild/setup-bazelisk@v2
-      - name: LinuxX64Build
-        run: |
-          bazel build --features=fully_static_link --cxxopt=-std=c++20 --cxxopt=-DSNOVA_VERSION="${BUILD_VERSION}" --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_x64 //...
-      - run: tar czf snova_asio_"${BUILD_VERSION}"_linux_musl_amd64.tar.gz -C ./bazel-bin/snova/app/ snova
-      - name: LinuxArmEABIBuild
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          bazel clean --expunge
-          bazel build --features=fully_static_link --cxxopt=-std=c++20 --cxxopt=-DSNOVA_VERSION="${BUILD_VERSION}" --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_arm_eabi //...
-      - run: tar czf snova_asio_"${BUILD_VERSION}"_linux_musl_arm_eabi.tar.gz -C ./bazel-bin/snova/app/ snova
-      - name: LinuxArmEABIHFBuild
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          bazel clean --expunge
-          bazel build --features=fully_static_link --cxxopt=-std=c++20 --cxxopt=-DSNOVA_VERSION="${BUILD_VERSION}" --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:linux_musl_arm_eabihf //...
-      - run: tar czf snova_asio_"${BUILD_VERSION}"_linux_musl_arm_eabihf.tar.gz -C ./bazel-bin/snova/app/ snova
+      - name: Build
+        run: sh ./scripts/ci_build.sh ${{ matrix.cpu }}
+        shell: bash
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           fail_on_unmatched_files: true
-          files: snova_asio_**.tar.gz
-  windows_build:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Get the tag version
-        id: get_version
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          $version = $Env:GITHUB_REF.Split("/")[2]
-          echo "BUILD_VERSION=$version" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
-        shell: pwsh
-      - name: Get the commit version
-        if: startsWith(github.ref, 'refs/tags/') != true
-        run: |
-          $version = $Env:GITHUB_SHA
-          echo "BUILD_VERSION=$version" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
-        shell: pwsh
-      - uses: bazelbuild/setup-bazelisk@v2
-      - name: WindowsX64Build
-        run: bazel.exe build --features=fully_static_link --cxxopt=/O2 --enable_runfiles --cxxopt=/std:c++20  --cxxopt=/DSNOVA_VERSION="$env:BUILD_VERSION" //...
-        shell: pwsh
-      - name: WindowsX64Archive
-        run: tar czf snova_asio_"$env:BUILD_VERSION"_windows_amd64.tar.gz -C ./bazel-bin/snova/app/ snova.exe 
-        shell: pwsh
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: snova_asio_**.tar.gz
-          fail_on_unmatched_files: true
-  macos_build:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Get the tag version
-        id: get_version
-        if: startsWith(github.ref, 'refs/tags/')
-        run: echo BUILD_VERSION="$(echo "${GITHUB_REF}" | cut -d / -f 3)" >> "$GITHUB_ENV"
-      - name: Get the commit version
-        if: startsWith(github.ref, 'refs/tags/') != true
-        run: echo BUILD_VERSION="${GITHUB_SHA}" >> "$GITHUB_ENV"
-      - uses: bazelbuild/setup-bazelisk@v2
-      - name: MacX64Build
-        run:  bazel build --features=fully_static_link --copt=-flto --linkopt=-flto --cxxopt=-std=c++20 --cxxopt=-DSNOVA_VERSION="${BUILD_VERSION}" //...
-      - run: tar czf snova_asio_"${BUILD_VERSION}"_darwin_amd64.tar.gz -C ./bazel-bin/snova/app/ snova
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: snova_asio_**.tar.gz
-          fail_on_unmatched_files: true
+          files: snova_asio_**.tar.bz2
 # jscpd:ignore-end
   

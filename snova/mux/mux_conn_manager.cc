@@ -28,8 +28,14 @@
  */
 #include "snova/mux/mux_conn_manager.h"
 #include <utility>
+#include "snova/server/tunnel_server.h"
 #include "snova/util/flags.h"
 namespace snova {
+MuxSession::~MuxSession() {
+  for (auto server_id : tunnel_servers) {
+    close_tunnel_server(server_id);
+  }
+}
 void MuxSession::ReportStatInfo(StatKeyValue& kv) {
   uint32_t now = time(nullptr);
   for (size_t i = 0; i < conns.size(); i++) {
@@ -179,7 +185,8 @@ MuxSessionPtr MuxConnManager::GetSession(std::string_view user, uint64_t client_
   return session;
 }
 
-uint32_t MuxConnManager::Add(std::string_view user, uint64_t client_id, MuxConnectionPtr conn) {
+MuxSessionPtr MuxConnManager::Add(std::string_view user, uint64_t client_id, MuxConnectionPtr conn,
+                                  uint32_t* conn_idx) {
   UserMuxConnPtr user_conn = GetUserMuxConn(user);
   MuxSessionPtr& session = user_conn->sessions[conn->GetType()][client_id];
   if (!session) {
@@ -189,12 +196,18 @@ uint32_t MuxConnManager::Add(std::string_view user, uint64_t client_id, MuxConne
   for (auto& c : session->conns) {
     if (!c) {
       c = conn;
-      return idx;
+      if (nullptr != conn_idx) {
+        *conn_idx = idx;
+      }
+      return session;
     }
     idx++;
   }
   session->conns.emplace_back(conn);
-  return session->conns.size() - 1;
+  if (nullptr != conn_idx) {
+    *conn_idx = session->conns.size() - 1;
+  }
+  return session;
 }
 void MuxConnManager::Remove(std::string_view user, uint64_t client_id, MuxConnection* conn) {
   auto user_found = mux_conns_.find(user);

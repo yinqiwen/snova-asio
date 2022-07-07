@@ -26,51 +26,48 @@
  *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#pragma once
-#include <memory>
-#include <optional>
-#include <string>
-#include <vector>
 #include "snova/util/tunnel_opt.h"
+#include <tuple>
+#include <vector>
+#include "absl/strings/numbers.h"
+#include "absl/strings/str_split.h"
 
 namespace snova {
-extern bool g_is_middle_node;
-extern bool g_is_entry_node;
-extern bool g_is_exit_node;
-extern bool g_is_redirect_node;
 
-extern uint16_t g_http_proxy_port;
-extern uint32_t g_conn_num_per_server;
-extern uint32_t g_connection_expire_secs;
-extern uint32_t g_connection_max_inactive_secs;
-extern uint32_t g_iobuf_max_pool_size;
-extern uint32_t g_stream_io_timeout_secs;
-extern uint32_t g_tcp_write_timeout_secs;
-extern uint32_t g_entry_socket_send_buffer_size;
-extern uint32_t g_entry_socket_recv_buffer_size;
+static bool parse_tunnel_opt(const std::string& addr,
+                             std::tuple<uint16_t, std::string, uint16_t>* opt) {
+  std::vector<absl::string_view> parts = absl::StrSplit(addr, ":");
+  if (parts.size() != 3) {
+    return false;
+  }
+  uint32_t port0, port2 = 0;
+  if (!absl::SimpleAtoi(parts[0], &port0) || !absl::SimpleAtoi(parts[2], &port2)) {
+    return false;
+  }
+  std::string host(parts[1].data(), parts[1].size());
+  *opt = std::make_tuple(static_cast<uint16_t>(port0), host, static_cast<uint16_t>(port2));
+  return true;
+}
 
-class GlobalFlags {
- public:
-  static std::shared_ptr<GlobalFlags>& GetIntance();
-  void SetHttpProxyHost(const std::string& s);
-  const std::string& GetHttpProxyHost();
-  void SetRemoteServer(const std::string& s);
-  const std::string& GetRemoteServer();
-  void SetUser(const std::string& s);
-  const std::string& GetUser();
+bool LocalTunnelOption::Parse(const std::string& addr, LocalTunnelOption* opt) {
+  std::tuple<uint16_t, std::string, uint16_t> result;
+  if (!parse_tunnel_opt(addr, &result)) {
+    return false;
+  }
+  opt->local_port = std::get<0>(result);
+  opt->remote_host = std::get<1>(result);
+  opt->remote_port = std::get<2>(result);
+  return true;
+}
 
-  void AddLocalTunnelOption(const LocalTunnelOption& opt);
-  void AddRemoteTunnelOption(const RemoteTunnelOption& opt);
-  const std::vector<LocalTunnelOption>& GetLocalTunnelOptions() const;
-  const std::vector<RemoteTunnelOption>& GetRemoteTunnelOptions() const;
-
- private:
-  std::string http_proxy_host_;
-  std::string remote_server_;
-  std::string user_;
-  std::vector<LocalTunnelOption> local_tunnels_;
-  std::vector<RemoteTunnelOption> remote_tunnels_;
-};
-
+bool RemoteTunnelOption::Parse(const std::string& addr, RemoteTunnelOption* opt) {
+  std::tuple<uint16_t, std::string, uint16_t> result;
+  if (!parse_tunnel_opt(addr, &result)) {
+    return false;
+  }
+  opt->remote_port = std::get<0>(result);
+  opt->local_host = std::get<1>(result);
+  opt->local_port = std::get<2>(result);
+  return true;
+}
 }  // namespace snova

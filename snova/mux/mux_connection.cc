@@ -30,6 +30,7 @@
 #include <utility>
 #include "asio/experimental/as_tuple.hpp"
 #include "asio/experimental/promise.hpp"
+#include "snova/server/tunnel_server.h"
 #include "snova/util/flags.h"
 #include "snova/util/misc_helper.h"
 #include "snova/util/time_wheel.h"
@@ -211,6 +212,43 @@ asio::awaitable<bool> MuxConnection::ClientAuth(const std::string& user, uint64_
   auth_user_ = user;
   co_return success;
 }
+
+asio::awaitable<bool> MuxConnection::OpenTunnel(uint16_t remote_port, const std::string& local_host,
+                                                uint16_t local_port, bool is_tcp, bool is_udp) {
+  std::unique_ptr<TunnelOpenRequest> tunnel_req = std::make_unique<TunnelOpenRequest>();
+  tunnel_req->event.remote_port = remote_port;
+  tunnel_req->event.local_port = local_port;
+  tunnel_req->event.is_tcp = is_tcp;
+  snprintf(tunnel_req->event.local_host, sizeof(tunnel_req->event.local_host), "%s",
+           local_host.c_str());
+  bool write_success = co_await WriteEvent(std::move(tunnel_req));
+  if (!write_success) {
+    SNOVA_ERROR("Write tunnel request failed.");
+    co_return false;
+  }
+  std::unique_ptr<MuxEvent> tunnel_res;
+  int rc = co_await ReadEvent(tunnel_res);
+  if (0 != rc) {
+    SNOVA_ERROR("Oops! Read tunnel response failed with rc:{}, maybe the cipher config is invalid.",
+                rc);
+    co_return false;
+  }
+  TunnelOpenResponse* tunnel_res_event = dynamic_cast<TunnelOpenResponse*>(tunnel_res.get());
+  if (nullptr == tunnel_res_event) {
+    SNOVA_ERROR("Recv non tunnel response with type:{}", tunnel_res_event->head.type);
+    co_return false;
+  }
+  bool success = tunnel_res_event->event.success;
+  if (!success) {
+    SNOVA_ERROR("Recv error tunnel response with error:{}", tunnel_res_event->event.errc);
+    co_return false;
+  } else {
+    SNOVA_INFO("Success to tunnel {}://{}:{}:{} with id:{}", is_tcp ? "tcp" : "udp", remote_port,
+               local_host, local_port, tunnel_res_event->event.tunnel_id);
+    co_return true;
+  }
+}
+
 int MuxConnection::ReadEventFromBuffer(std::unique_ptr<MuxEvent>& event, Bytes& buffer) {
   if (buffer.size() == 0) {
     return ERR_NEED_MORE_INPUT_DATA;
@@ -281,6 +319,13 @@ asio::awaitable<int> MuxConnection::ProcessReadEvent() {
       retired_ = true;
       if (retire_callback_) {
         retire_callback_(this);
+      }
+      break;
+    }
+    case EVENT_TUNNEL_OPEN_REQ: {
+      auto rsp = co_await tunnel_server_handler(auth_user_, client_id_, std::move(event));
+      if (rsp) {
+        co_await WriteEvent(std::move(rsp));
       }
       break;
     }

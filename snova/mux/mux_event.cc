@@ -94,6 +94,26 @@ std::unique_ptr<MuxEvent> MuxEvent::NewEvent(MuxEventHead h) {
       event = std::make_unique<StreamChunk>();
       break;
     }
+    case EVENT_RETIRE_CONN_REQ: {
+      event = std::make_unique<RetireConnRequest>();
+      break;
+    }
+    case EVENT_TUNNEL_OPEN_REQ: {
+      event = std::make_unique<TunnelOpenRequest>();
+      break;
+    }
+    case EVENT_TUNNEL_OPEN_RSP: {
+      event = std::make_unique<TunnelOpenResponse>();
+      break;
+    }
+    case EVENT_TUNNEL_CLOSE_REQ: {
+      event = std::make_unique<TunnelCloseRequest>();
+      break;
+    }
+    case EVENT_COMMON_RES: {
+      event = std::make_unique<CommonResponse>();
+      break;
+    }
     default: {
       SNOVA_ERROR("Unknown event type:{}", h.type);
       return nullptr;
@@ -102,56 +122,6 @@ std::unique_ptr<MuxEvent> MuxEvent::NewEvent(MuxEventHead h) {
   event->head = h;
   return event;
 }
-
-// #define RETURN_NOT_OK(s)    \
-//   do {                      \
-//     int _s = (s);           \
-//     if (_s != 0) return _s; \
-//   } while (0)
-
-// template <typename T>
-// static void encode_int(MutableBytes& buffer, size_t pos, T v) {
-//   T enc = native_to_big(v);
-//   memcpy(buffer.data() + pos, &enc, sizeof(enc));
-// }
-
-// template <typename T>
-// static int decode_int(const Bytes& buffer, size_t pos, T& v) {
-//   if (buffer.size() < (pos + sizeof(T))) {
-//     return ERR_TOO_SMALL_EVENT_DECODE_CONTENT;
-//   }
-//   memcpy(&v, buffer.data() + pos, sizeof(v));
-//   v = big_to_native(v);
-//   return 0;
-// }
-
-// static void encode_string(MutableBytes& buffer, size_t pos, const std::string& str) {
-//   uint16_t elen = str.size();
-//   encode_int(buffer, pos, elen);
-//   memcpy(buffer.data() + pos + 2, str.data(), str.size());
-// }
-
-// static int decode_string(const Bytes& buffer, size_t pos, std::string& str) {
-//   uint16_t elen = 0;
-//   RETURN_NOT_OK(decode_int(buffer, pos, elen));
-//   if (elen >= (kMaxChunkSize - 2)) {
-//     return ERR_TOO_LARGE_EVENT_DECODE_LENGTH;
-//   }
-//   if (buffer.size() < (pos + 2 + elen)) {
-//     return ERR_TOO_SMALL_EVENT_DECODE_CONTENT;
-//   }
-//   str.resize(elen);
-//   memcpy(&str[0], buffer.data() + pos + 2, elen);
-//   return 0;
-// }
-
-// static int decode_bool(const Bytes& buffer, size_t pos, bool& v) {
-//   if (buffer.size() < (pos + 1)) {
-//     return ERR_TOO_SMALL_EVENT_DECODE_CONTENT;
-//   }
-//   v = (buffer.data()[pos] == 1);
-//   return 0;
-// }
 
 int AuthRequest::Encode(MutableBytes& buffer) const {
   pb_ostream_t output = pb_ostream_from_buffer(buffer.data(), buffer.size());
@@ -162,18 +132,6 @@ int AuthRequest::Encode(MutableBytes& buffer) const {
   size_t total = output.bytes_written;
   buffer.remove_suffix(buffer.size() - total);
   return 0;
-
-  // uint32_t len = user.size();
-  // if (len >= (kMaxChunkSize - 2)) {
-  //   return ERR_TOO_LARGE_EVENT_ENCODE_CONTENT;
-  // }
-  // encode_string(buffer, 0, user);
-  // encode_int(buffer, user.size() + 2, client_id);
-  // size_t pos = user.size() + 2 + sizeof(client_id);
-  // memcpy(buffer.data() + pos, &flags, 1);
-  // size_t total = (user.size() + 2 + sizeof(client_id) + 1);
-  // buffer.remove_suffix(buffer.size() - total);
-  return 0;
 }
 int AuthRequest::Decode(const Bytes& buffer) {
   pb_istream_t input = pb_istream_from_buffer(buffer.data(), buffer.size());
@@ -182,15 +140,6 @@ int AuthRequest::Decode(const Bytes& buffer) {
     return ERR_PB_DECODE;
   }
   return 0;
-
-  // RETURN_NOT_OK(decode_string(buffer, 0, user));
-  // RETURN_NOT_OK(decode_int(buffer, user.size() + 2, client_id));
-  // size_t pos = user.size() + 2 + sizeof(client_id);
-  // if (buffer.size() < (pos + 1)) {
-  //   return ERR_TOO_SMALL_EVENT_DECODE_CONTENT;
-  // }
-  // memcpy(&flags, buffer.data() + pos, 1);
-  // return 0;
 }
 
 int AuthResponse::Encode(MutableBytes& buffer) const {
@@ -202,11 +151,6 @@ int AuthResponse::Encode(MutableBytes& buffer) const {
   size_t total = output.bytes_written;
   buffer.remove_suffix(buffer.size() - total);
   return 0;
-  // encode_int(buffer, 0, iv);
-  // buffer.data()[sizeof(iv)] = (success ? 1 : 0);
-  // size_t total = (sizeof(iv) + 1);
-  // buffer.remove_suffix(buffer.size() - total);
-  // return 0;
 }
 int AuthResponse::Decode(const Bytes& buffer) {
   pb_istream_t input = pb_istream_from_buffer(buffer.data(), buffer.size());
@@ -215,9 +159,6 @@ int AuthResponse::Decode(const Bytes& buffer) {
     return ERR_PB_DECODE;
   }
   return 0;
-  // RETURN_NOT_OK(decode_int(buffer, 0, iv));
-  // RETURN_NOT_OK(decode_bool(buffer, sizeof(iv), success));
-  // return 0;
 }
 
 int StreamOpenRequest::Encode(MutableBytes& buffer) const {
@@ -229,15 +170,6 @@ int StreamOpenRequest::Encode(MutableBytes& buffer) const {
   size_t total = output.bytes_written;
   buffer.remove_suffix(buffer.size() - total);
   return 0;
-
-  // encode_string(buffer, 0, remote_host);
-  // size_t pos = remote_host.size() + 2;
-  // encode_int(buffer, pos, remote_port);
-  // pos += sizeof(remote_port);
-  // memcpy(buffer.data() + pos, &flags, 1);
-  // pos += 1;
-  // buffer.remove_suffix(buffer.size() - pos);
-  // return 0;
 }
 int StreamOpenRequest::Decode(const Bytes& buffer) {
   pb_istream_t input = pb_istream_from_buffer(buffer.data(), buffer.size());
@@ -246,16 +178,6 @@ int StreamOpenRequest::Decode(const Bytes& buffer) {
     return ERR_PB_DECODE;
   }
   return 0;
-  // RETURN_NOT_OK(decode_string(buffer, 0, remote_host));
-  // size_t pos = remote_host.size() + 2;
-  // RETURN_NOT_OK(decode_int(buffer, pos, remote_port));
-  // pos += sizeof(remote_port);
-  // if (buffer.size() < (pos + 1)) {
-  //   return ERR_TOO_SMALL_EVENT_DECODE_CONTENT;
-  // }
-  // memcpy(&flags, buffer.data() + pos, 1);
-  // // RETURN_NOT_OK(decode_bool(buffer, pos, is_tcp));
-  // return 0;
 }
 
 int StreamCloseRequest::Encode(MutableBytes& buffer) const {
@@ -296,6 +218,86 @@ int StreamChunk::Decode(const Bytes& buffer) {
   }
   chunk = get_iobuf(chunk_len);
   memcpy(chunk->data(), buffer.data(), chunk_len);
+  return 0;
+}
+
+int CommonResponse::Decode(const Bytes& buffer) {
+  pb_istream_t input = pb_istream_from_buffer(buffer.data(), buffer.size());
+  if (!pb_decode_delimited(&input, snova_CommonResponse_fields, &event)) {
+    SNOVA_ERROR("Decode CommonResponse failed:{}", PB_GET_ERROR(&input));
+    return ERR_PB_DECODE;
+  }
+  return 0;
+}
+
+int CommonResponse::Encode(MutableBytes& buffer) const {
+  pb_ostream_t output = pb_ostream_from_buffer(buffer.data(), buffer.size());
+  if (!pb_encode_delimited(&output, snova_CommonResponse_fields, &event)) {
+    SNOVA_ERROR("Encoding CommonResponse failed:{}", PB_GET_ERROR(&output));
+    return ERR_PB_ENCODE;
+  }
+  size_t total = output.bytes_written;
+  buffer.remove_suffix(buffer.size() - total);
+  return 0;
+}
+
+int TunnelOpenRequest::Decode(const Bytes& buffer) {
+  pb_istream_t input = pb_istream_from_buffer(buffer.data(), buffer.size());
+  if (!pb_decode_delimited(&input, snova_TunnelOpenRequest_fields, &event)) {
+    SNOVA_ERROR("Decode TunnelOpenRequest failed:{}", PB_GET_ERROR(&input));
+    return ERR_PB_DECODE;
+  }
+  return 0;
+}
+
+int TunnelOpenRequest::Encode(MutableBytes& buffer) const {
+  pb_ostream_t output = pb_ostream_from_buffer(buffer.data(), buffer.size());
+  if (!pb_encode_delimited(&output, snova_TunnelOpenRequest_fields, &event)) {
+    SNOVA_ERROR("Encoding TunnelOpenRequest failed:{}", PB_GET_ERROR(&output));
+    return ERR_PB_ENCODE;
+  }
+  size_t total = output.bytes_written;
+  buffer.remove_suffix(buffer.size() - total);
+  return 0;
+}
+
+int TunnelOpenResponse::Decode(const Bytes& buffer) {
+  pb_istream_t input = pb_istream_from_buffer(buffer.data(), buffer.size());
+  if (!pb_decode_delimited(&input, snova_TunnelOpenResponse_fields, &event)) {
+    SNOVA_ERROR("Decode TunnelOpenResponse failed:{}", PB_GET_ERROR(&input));
+    return ERR_PB_DECODE;
+  }
+  return 0;
+}
+
+int TunnelOpenResponse::Encode(MutableBytes& buffer) const {
+  pb_ostream_t output = pb_ostream_from_buffer(buffer.data(), buffer.size());
+  if (!pb_encode_delimited(&output, snova_TunnelOpenResponse_fields, &event)) {
+    SNOVA_ERROR("Encoding TunnelOpenResponse failed:{}", PB_GET_ERROR(&output));
+    return ERR_PB_ENCODE;
+  }
+  size_t total = output.bytes_written;
+  buffer.remove_suffix(buffer.size() - total);
+  return 0;
+}
+
+int TunnelCloseRequest::Decode(const Bytes& buffer) {
+  pb_istream_t input = pb_istream_from_buffer(buffer.data(), buffer.size());
+  if (!pb_decode_delimited(&input, snova_TunnelCloseRequest_fields, &event)) {
+    SNOVA_ERROR("Decode TunnelCloseRequest failed:{}", PB_GET_ERROR(&input));
+    return ERR_PB_DECODE;
+  }
+  return 0;
+}
+
+int TunnelCloseRequest::Encode(MutableBytes& buffer) const {
+  pb_ostream_t output = pb_ostream_from_buffer(buffer.data(), buffer.size());
+  if (!pb_encode_delimited(&output, snova_TunnelCloseRequest_fields, &event)) {
+    SNOVA_ERROR("Encoding TunnelCloseRequest failed:{}", PB_GET_ERROR(&output));
+    return ERR_PB_ENCODE;
+  }
+  size_t total = output.bytes_written;
+  buffer.remove_suffix(buffer.size() - total);
   return 0;
 }
 

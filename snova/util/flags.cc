@@ -58,4 +58,18 @@ const std::string& GlobalFlags::GetRemoteServer() { return remote_server_; }
 void GlobalFlags::SetUser(const std::string& s) { user_ = s; }
 const std::string& GlobalFlags::GetUser() { return user_; }
 
+void GlobalFlags::AddLocalTunnelOption(const LocalTunnelOption& opt) {
+  local_tunnels_.emplace_back(opt);
+}
+void GlobalFlags::AddRemoteTunnelOption(const RemoteTunnelOption& opt) {
+  remote_tunnels_.emplace_back(opt);
+}
+
+const std::vector<LocalTunnelOption>& GlobalFlags::GetLocalTunnelOptions() const {
+  return local_tunnels_;
+}
+const std::vector<RemoteTunnelOption>& GlobalFlags::GetRemoteTunnelOptions() const {
+  return remote_tunnels_;
+}
+
 }  // namespace snova

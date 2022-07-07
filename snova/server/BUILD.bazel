@@ -32,7 +32,43 @@ cc_library(
         "//snova/util:sni",
         "@asio",
         "@com_google_absl//absl/cleanup",
-        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "tunnel_server_api",
+    hdrs = [
+        "tunnel_server.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        "//snova/io",
+        "//snova/mux:mux_event",
+        "//snova/util:address",
+        "@asio",
+    ],
+)
+
+cc_library(
+    name = "tunnel_server",
+    srcs = [
+        "tunnel_server.cc",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        ":relay",
+        ":tunnel_server_api",
+        "//snova/io",
+        "//snova/io:io_util",
+        "//snova/log:log_api",
+        "//snova/mux:mux_conn_manager",
+        "//snova/util:flags",
+        "//snova/util:net_helper",
+        "//snova/util:sni",
+        "@asio",
+        "@com_google_absl//absl/cleanup",
+        "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/strings",
     ],
 )

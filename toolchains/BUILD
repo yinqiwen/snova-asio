@@ -76,6 +76,14 @@ platform(
     ],
 )
 
+platform(
+    name = "linux_musl_aarch64",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+)
+
 toolchain(
     name = "x64_linux_musl_gcc_compile_toolchain",
     exec_compatible_with = [
@@ -164,6 +172,23 @@ toolchain(
     toolchain = select({
         "//:local_musl": "@local_arm_linux_musleabihf//:cc_toolchain",
         "//conditions:default": "@arm_linux_musleabihf//:cc_toolchain",
+    }),
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)
+
+toolchain(
+    name = "aarch64_linux_musl_gcc_compile_toolchain",
+    exec_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    target_compatible_with = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    toolchain = select({
+        "//:local_musl": "@local_aarch64_linux_musl_gcc//:cc_toolchain",
+        "//conditions:default": "@aarch64_linux_musl//:cc_toolchain",
     }),
     toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
 )

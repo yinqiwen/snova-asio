@@ -42,8 +42,10 @@ namespace snova {
 struct MuxSession : public std::enable_shared_from_this<MuxSession> {
   using MuxConnArray = std::vector<MuxConnectionPtr>;
   MuxConnArray conns;
+  std::vector<uint64_t> tunnel_servers;
   EventWriterFactory GetEventWriterFactory();
   void ReportStatInfo(StatKeyValue& kv);
+  ~MuxSession();
 };
 using MuxSessionPtr = std::shared_ptr<MuxSession>;
 struct UserMuxConn {
@@ -61,7 +63,8 @@ class MuxConnManager {
   void RegisterStat();
 
   MuxSessionPtr GetSession(std::string_view user, uint64_t client_id, MuxConnectionType type);
-  uint32_t Add(std::string_view user, uint64_t client_id, MuxConnectionPtr conn);
+  MuxSessionPtr Add(std::string_view user, uint64_t client_id, MuxConnectionPtr conn,
+                    uint32_t* idx);
   void Remove(std::string_view user, uint64_t client_id, MuxConnectionPtr conn);
   void Remove(std::string_view user, uint64_t client_id, MuxConnection* conn);
 
