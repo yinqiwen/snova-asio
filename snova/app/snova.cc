@@ -28,6 +28,7 @@
  */
 #include <stdio.h>
 #include <limits>
+#include <memory>
 #include <random>
 #include <string>
 #include <vector>
@@ -51,6 +52,8 @@
 #include "snova/util/time_wheel.h"
 
 #include "spdlog/fmt/fmt.h"
+#include "spdlog/sinks/rotating_file_sink.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
@@ -77,7 +80,19 @@ static void init_stats() {
 int main(int argc, char** argv) {
   CLI::App app{"SNOVA:A private proxy tool for low-end boxes."};
   app.set_version_flag("--version", TOSTRING(SNOVA_VERSION));
-  app.set_config("--config", "", "Config file path", false);
+  app.set_config("--config", "",
+                 "Config file path, all cli options can be set into a toml file as the config.",
+                 false);
+
+  std::string log_file;
+  app.add_option("--log_file", log_file, "Log file, default is stdout");
+  int64_t max_log_file_size = 1024 * 1024;
+  app.add_option("--max_log_file_size", max_log_file_size, "Max log file size");
+  int32_t max_log_file_num = 2;
+  app.add_option("--max_log_file_num", max_log_file_num, "Max log file number");
+  bool alsologtostderr = false;
+  app.add_option("--alsologtostderr", alsologtostderr, "Also log to stderr");
+
   std::string listen = "0.0.0.0:48100";
   std::vector<std::string> multi_listens;
   app.add_option("--listen", multi_listens, "Listen address");
@@ -129,6 +144,24 @@ int main(int argc, char** argv) {
                  "works with exit node.");
 
   CLI11_PARSE(app, argc, argv);
+
+  if (!log_file.empty()) {
+    auto rotate_file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+        log_file, max_log_file_size, max_log_file_num);
+    // Create logger, it use rotate_file_sink.
+    std::vector<spdlog::sink_ptr> sinks;
+    sinks.emplace_back(std::move(rotate_file_sink));
+    if (alsologtostderr) {
+      auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
+      sinks.emplace_back(std::move(console_sink));
+    }
+    auto root_logger = std::make_shared<spdlog::logger>("main", sinks.begin(), sinks.end());
+    root_logger->set_level(spdlog::level::info);
+    root_logger->flush_on(spdlog::level::info);
+    spdlog::register_logger(root_logger);
+    // Set default logger.
+    spdlog::set_default_logger(root_logger);
+  }
 
   if (!proxy_server.empty()) {
     if (!absl::StartsWith(proxy_server, "http://")) {

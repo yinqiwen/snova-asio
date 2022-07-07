@@ -15,6 +15,7 @@ register_toolchains(
     "//toolchains:armv5l_linux_musleabi_gcc_compile_toolchain",
     "//toolchains:arm_linux_musleabi_gcc_compile_toolchain",
     "//toolchains:arm_linux_musleabihf_gcc_compile_toolchain",
+    "//toolchains:aarch64_linux_musl_gcc_compile_toolchain",
 )
 
 # register_execution_platforms("//toolchains:linux_armv7")
