@@ -24,6 +24,7 @@ cc_binary(
         "//snova/mux:mux_client",
         "//snova/server:entry_server",
         "//snova/server:mux_server",
+        "//snova/server:tunnel_server",
         "//snova/util:address",
         "//snova/util:flags",
         "//snova/util:misc_helper",

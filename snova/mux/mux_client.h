@@ -47,7 +47,7 @@ class MuxClient {
                                         const std::string& cipher_key);
 
  private:
-  asio::awaitable<std::error_code> NewConnection(uint32_t idx);
+  asio::awaitable<std::error_code> NewConnection(uint32_t idx, bool try_open_tunnel);
   asio::awaitable<void> CheckConnections();
   MuxConnectionType conn_type_ = MUX_EXIT_CONN;
   MuxSessionPtr remote_session_;

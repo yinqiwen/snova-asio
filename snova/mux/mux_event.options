@@ -1,2 +1,4 @@
 snova.AuthRequest.user 	                max_size:256
 snova.StreamOpenRequest.remote_host 	max_size:512
+snova.TunnelOpenRequest.local_host      max_size:512
+snova.CommonResponse.reason             max_size:512

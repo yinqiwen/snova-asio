@@ -2,6 +2,12 @@ syntax = "proto3";
 
 package snova;
 
+message CommonResponse {
+  bool success = 1;
+  int32 errc = 2;
+  string reason = 3;
+}
+
 message AuthRequest {
   string user = 1;
   uint64 client_id = 2;
@@ -20,4 +26,20 @@ message StreamOpenRequest {
   uint32 remote_port = 2;
   bool is_tcp = 3;
   bool is_tls = 4;
+}
+
+message TunnelOpenRequest {
+  string local_host = 1;
+  uint32 local_port = 2;
+  uint32 remote_port = 3;
+  bool is_tcp = 4;
+}
+message TunnelOpenResponse {
+  bool success = 1;
+  uint64 tunnel_id = 2;
+  int32 errc = 3;
+}
+
+message TunnelCloseRequest {
+  uint64 tunnel_id = 1;
 }

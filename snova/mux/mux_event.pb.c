@@ -6,6 +6,9 @@
 #error Regenerate this file with the current version of nanopb generator.
 #endif
 
+PB_BIND(snova_CommonResponse, snova_CommonResponse, 2)
+
+
 PB_BIND(snova_AuthRequest, snova_AuthRequest, 2)
 
 
@@ -13,6 +16,15 @@ PB_BIND(snova_AuthResponse, snova_AuthResponse, AUTO)
 
 
 PB_BIND(snova_StreamOpenRequest, snova_StreamOpenRequest, 2)
+
+
+PB_BIND(snova_TunnelOpenRequest, snova_TunnelOpenRequest, 2)
+
+
+PB_BIND(snova_TunnelOpenResponse, snova_TunnelOpenResponse, AUTO)
+
+
+PB_BIND(snova_TunnelCloseRequest, snova_TunnelCloseRequest, AUTO)
 
 
 

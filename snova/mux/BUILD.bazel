@@ -126,6 +126,7 @@ cc_library(
     deps = [
         ":cipher_context",
         ":mux_stream",
+        "//snova/server:tunnel_server_api",
         "//snova/util:async_mutex",
         "//snova/util:misc_helper",
         "//snova/util:stat",
@@ -145,6 +146,7 @@ cc_library(
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
         ":mux_connection",
+        "//snova/server:tunnel_server_api",
         "//snova/util:flags",
     ],
 )

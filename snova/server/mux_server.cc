@@ -115,7 +115,8 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock,
         },
         [retired_conn]() -> uint32_t { return retired_conn->GetLastActiveUnixSecs(); }, 60);
   });
-  uint32_t idx = MuxConnManager::GetInstance()->Add(mux_user, client_id, mux_conn);
+  uint32_t idx = 0;
+  MuxConnManager::GetInstance()->Add(mux_user, client_id, mux_conn, &idx);
   mux_conn->SetIdx(idx);
   auto ex = co_await asio::this_coro::executor;
   co_await mux_conn->ReadEventLoop();

@@ -45,6 +45,7 @@
 #define ERR_TOO_SMALL_EVENT_DECODE_CONTENT -1006
 #define ERR_PB_ENCODE -1007
 #define ERR_PB_DECODE -1008
+#define ERR_EMPTY_MUX_SESSION -1009
 
 namespace snova {
 static constexpr uint16_t kEventHeadSize = 8;
@@ -74,6 +75,10 @@ enum EventType {
   EVENT_STREAM_CLOSE,
   EVENT_STREAM_CHUNK,
   EVENT_RETIRE_CONN_REQ,
+  EVENT_TUNNEL_OPEN_REQ,
+  EVENT_TUNNEL_OPEN_RSP,
+  EVENT_TUNNEL_CLOSE_REQ,
+  EVENT_COMMON_RES = 100,
 };
 
 struct MuxEvent {
@@ -88,17 +93,6 @@ struct MuxEvent {
 using EventWriter = std::function<asio::awaitable<bool>(std::unique_ptr<MuxEvent>&&)>;
 using EventWriterFactory = std::function<EventWriter()>;
 
-// struct AuthFlags {
-//   unsigned is_entry : 1;
-//   unsigned is_exit : 1;
-//   unsigned is_middle : 1;
-//   unsigned reserved : 6;
-//   AuthFlags() {
-//     is_entry = 0;
-//     is_exit = 0;
-//     reserved = 0;
-//   }
-// };
 struct AuthRequest : public MuxEvent {
   snova_AuthRequest event = snova_AuthRequest_init_default;
   // std::string user;
@@ -110,8 +104,7 @@ struct AuthRequest : public MuxEvent {
 };
 struct AuthResponse : public MuxEvent {
   snova_AuthResponse event = snova_AuthResponse_init_default;
-  // bool success;
-  // uint64_t iv = 0;
+
   AuthResponse() { head.type = EVENT_AUTH_RES; }
   int Encode(MutableBytes& buffer) const override;
   int Decode(const Bytes& buffer) override;
@@ -123,22 +116,9 @@ struct RetireConnRequest : public MuxEvent {
   int Decode(const Bytes& buffer) override;
 };
 
-// struct StreamOpenFlags {
-//   unsigned is_tcp : 1;
-//   unsigned is_tls : 1;
-//   unsigned reserved : 6;
-//   StreamOpenFlags() {
-//     is_tcp = 1;
-//     is_tls = 0;
-//     reserved = 0;
-//   }
-// };
-
 struct StreamOpenRequest : public MuxEvent {
   snova_StreamOpenRequest event = snova_StreamOpenRequest_init_default;
-  // std::string remote_host;
-  // uint16_t remote_port = 0;
-  // StreamOpenFlags flags;
+
   StreamOpenRequest() { head.type = EVENT_STREAM_OPEN; }
   int Encode(MutableBytes& buffer) const override;
   int Decode(const Bytes& buffer) override;
@@ -153,6 +133,32 @@ struct StreamChunk : public MuxEvent {
   IOBufPtr chunk;
   uint32_t chunk_len = 0;
   StreamChunk() { head.type = EVENT_STREAM_CHUNK; }
+  int Encode(MutableBytes& buffer) const override;
+  int Decode(const Bytes& buffer) override;
+};
+
+struct CommonResponse : public MuxEvent {
+  snova_CommonResponse event = snova_CommonResponse_init_default;
+  CommonResponse() { head.type = EVENT_COMMON_RES; }
+  int Encode(MutableBytes& buffer) const override;
+  int Decode(const Bytes& buffer) override;
+};
+
+struct TunnelOpenRequest : public MuxEvent {
+  snova_TunnelOpenRequest event = snova_TunnelOpenRequest_init_default;
+  TunnelOpenRequest() { head.type = EVENT_TUNNEL_OPEN_REQ; }
+  int Encode(MutableBytes& buffer) const override;
+  int Decode(const Bytes& buffer) override;
+};
+struct TunnelOpenResponse : public MuxEvent {
+  snova_TunnelOpenResponse event = snova_TunnelOpenResponse_init_default;
+  TunnelOpenResponse() { head.type = EVENT_TUNNEL_OPEN_RSP; }
+  int Encode(MutableBytes& buffer) const override;
+  int Decode(const Bytes& buffer) override;
+};
+struct TunnelCloseRequest : public MuxEvent {
+  snova_TunnelCloseRequest event = snova_TunnelCloseRequest_init_default;
+  TunnelCloseRequest() { head.type = EVENT_TUNNEL_CLOSE_REQ; }
   int Encode(MutableBytes& buffer) const override;
   int Decode(const Bytes& buffer) override;
 };

@@ -29,48 +29,20 @@
 
 #pragma once
 #include <memory>
-#include <optional>
 #include <string>
-#include <vector>
-#include "snova/util/tunnel_opt.h"
+#include <utility>
+
+#include "asio.hpp"
+#include "snova/io/io.h"
+#include "snova/mux/mux_event.h"
+#include "snova/util/address.h"
 
 namespace snova {
-extern bool g_is_middle_node;
-extern bool g_is_entry_node;
-extern bool g_is_exit_node;
-extern bool g_is_redirect_node;
-
-extern uint16_t g_http_proxy_port;
-extern uint32_t g_conn_num_per_server;
-extern uint32_t g_connection_expire_secs;
-extern uint32_t g_connection_max_inactive_secs;
-extern uint32_t g_iobuf_max_pool_size;
-extern uint32_t g_stream_io_timeout_secs;
-extern uint32_t g_tcp_write_timeout_secs;
-extern uint32_t g_entry_socket_send_buffer_size;
-extern uint32_t g_entry_socket_recv_buffer_size;
-
-class GlobalFlags {
- public:
-  static std::shared_ptr<GlobalFlags>& GetIntance();
-  void SetHttpProxyHost(const std::string& s);
-  const std::string& GetHttpProxyHost();
-  void SetRemoteServer(const std::string& s);
-  const std::string& GetRemoteServer();
-  void SetUser(const std::string& s);
-  const std::string& GetUser();
-
-  void AddLocalTunnelOption(const LocalTunnelOption& opt);
-  void AddRemoteTunnelOption(const RemoteTunnelOption& opt);
-  const std::vector<LocalTunnelOption>& GetLocalTunnelOptions() const;
-  const std::vector<RemoteTunnelOption>& GetRemoteTunnelOptions() const;
-
- private:
-  std::string http_proxy_host_;
-  std::string remote_server_;
-  std::string user_;
-  std::vector<LocalTunnelOption> local_tunnels_;
-  std::vector<RemoteTunnelOption> remote_tunnels_;
-};
+using TunnelServerListenResult = std::pair<uint64_t, std::error_code>;
+asio::awaitable<TunnelServerListenResult> start_tunnel_server(const NetAddress& listen_addr,
+                                                              const NetAddress& dst_addr);
+void close_tunnel_server(uint32_t server_id);
+asio::awaitable<std::unique_ptr<MuxEvent>> tunnel_server_handler(
+    const std::string& user, uint64_t client_id, std::unique_ptr<MuxEvent>&& tunnel_request);
 
 }  // namespace snova

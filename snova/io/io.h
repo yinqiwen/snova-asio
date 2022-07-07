@@ -76,6 +76,9 @@ struct Stream {
 };
 using StreamPtr = std::shared_ptr<Stream>;
 using SocketRef = ::asio::ip::tcp::socket&;
+using TCPServerSocket = ::asio::ip::tcp::acceptor;
+using TCPServerSocketPtr = std::shared_ptr<TCPServerSocket>;
+using TCPListenResult = std::pair<TCPServerSocketPtr, std::error_code>;
 using IOBufRef = IOBuf&;
 
 void register_io_stat();

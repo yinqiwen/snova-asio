@@ -43,6 +43,7 @@
 #include "snova/mux/mux_client.h"
 #include "snova/server/entry_server.h"
 #include "snova/server/mux_server.h"
+#include "snova/server/tunnel_server.h"
 #include "snova/util/address.h"
 #include "snova/util/flags.h"
 #include "snova/util/misc_helper.h"
@@ -119,6 +120,14 @@ int main(int argc, char** argv) {
   app.add_option("--entry_socket_recv_buffer_size", snova::g_entry_socket_recv_buffer_size,
                  "Entry server socket recv buffer size.");
 
+  std::vector<std::string> local_tunnel_opts, remote_tunnel_opts;
+  app.add_option("-L", local_tunnel_opts,
+                 "Local tunnel options, foramt  <local port>:<remote host>:<remote port>, only "
+                 "works with entry node.");
+  app.add_option("-R", remote_tunnel_opts,
+                 "Remote tunnel options, foramt  <remote port>:<local host>:<local port>, only "
+                 "works with exit node.");
+
   CLI11_PARSE(app, argc, argv);
 
   if (!proxy_server.empty()) {
@@ -151,15 +160,42 @@ int main(int argc, char** argv) {
     return -1;
   }
 
-  if (snova::g_is_entry_node || snova::g_is_middle_node) {
+  if (snova::g_is_middle_node) {
     if (multi_listens.empty()) {
-      error_exit("No 'listen' specified for entry/middle nide.");
+      error_exit("No 'listen' specified for middle node.");
       return -1;
     }
-    // if (remote_server.empty()) {
-    //   error_exit("'remote' is empty for entry/middle node.");
-    //   return -1;
-    // }
+  }
+  if (snova::g_is_entry_node) {
+    if (multi_listens.empty() && local_tunnel_opts.empty()) {
+      error_exit("No 'listen' specified for entry node.");
+      return -1;
+    }
+  }
+
+  if (!local_tunnel_opts.empty() && !snova::g_is_entry_node) {
+    error_exit("'-L' tunnel options only works with entry mode.");
+    return -1;
+  }
+  if (!remote_tunnel_opts.empty() && !snova::g_is_exit_node) {
+    error_exit("'-L' tunnel options only works with exit mode.");
+    return -1;
+  }
+  for (const auto& addr : local_tunnel_opts) {
+    snova::LocalTunnelOption opt;
+    if (!snova::LocalTunnelOption::Parse(addr, &opt)) {
+      error_exit("Invalid '-L' args.");
+      return -1;
+    }
+    snova::GlobalFlags::GetIntance()->AddLocalTunnelOption(opt);
+  }
+  for (const auto& addr : remote_tunnel_opts) {
+    snova::RemoteTunnelOption opt;
+    if (!snova::RemoteTunnelOption::Parse(addr, &opt)) {
+      error_exit("Invalid '-R' args.");
+      return -1;
+    }
+    snova::GlobalFlags::GetIntance()->AddRemoteTunnelOption(opt);
   }
 
   snova::GlobalFlags::GetIntance()->SetRemoteServer(remote_server);
@@ -210,6 +246,25 @@ int main(int argc, char** argv) {
     } else {
       ::asio::co_spawn(ctx, snova::start_entry_server(*listen_addr), ::asio::detached);
     }
+  }
+
+  if (!local_tunnel_opts.empty()) {
+    ::asio::co_spawn(
+        ctx,
+        []() -> asio::awaitable<void> {
+          for (const auto& tunnel_opt : snova::GlobalFlags::GetIntance()->GetLocalTunnelOptions()) {
+            snova::NetAddress src_addr, dst_addr;
+            src_addr.host = "0.0.0.0";
+            src_addr.port = tunnel_opt.local_port;
+            dst_addr.host = tunnel_opt.remote_host;
+            dst_addr.port = tunnel_opt.remote_port;
+            auto [_, ec] = co_await snova::start_tunnel_server(src_addr, dst_addr);
+            if (ec) {
+              error_exit("Failed to start tunnel server.");
+            }
+          }
+        },
+        ::asio::detached);
   }
 
   init_stats();

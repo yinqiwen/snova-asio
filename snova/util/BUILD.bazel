@@ -9,6 +9,20 @@ package(
 )
 
 cc_library(
+    name = "tunnel_opt",
+    srcs = [
+        "tunnel_opt.cc",
+    ],
+    hdrs = [
+        "tunnel_opt.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
     name = "time_wheel",
     srcs = [
         "time_wheel.cc",
@@ -50,6 +64,7 @@ cc_library(
     ],
     copts = SNOVA_DEFAULT_COPTS,
     deps = [
+        ":tunnel_opt",
         "//snova/log:log_api",
         "@asio",
         "@com_google_absl//absl/container:btree",
