@@ -76,6 +76,12 @@ static asio::awaitable<void> do_relay(T& local_stream, const Bytes& readed_data,
         [&]() -> uint32_t { return latest_io_time; }, g_stream_io_timeout_secs);
   }
 
+  absl::Cleanup auto_cancel_timeout = [&cancel_transfer_timeout] {
+    if (cancel_transfer_timeout) {
+      cancel_transfer_timeout();
+    }
+  };
+
   bool direct_relay = (g_is_exit_node || relay_ctx.direct);
   if (direct_relay) {
     auto remote_socket = co_await get_connected_socket(relay_ctx.remote_host, relay_ctx.remote_port,
@@ -93,9 +99,9 @@ static asio::awaitable<void> do_relay(T& local_stream, const Bytes& readed_data,
         SNOVA_ERROR("ex:{}", ex.what());
       }
     }
-    if (cancel_transfer_timeout) {
-      cancel_transfer_timeout();
-    }
+    // if (cancel_transfer_timeout) {
+    //   cancel_transfer_timeout();
+    // }
     co_return;
   } else {
     auto ex = co_await asio::this_coro::executor;
@@ -129,9 +135,9 @@ static asio::awaitable<void> do_relay(T& local_stream, const Bytes& readed_data,
     } catch (std::exception& ex) {
       SNOVA_ERROR("ex:{}", ex.what());
     }
-    if (cancel_transfer_timeout) {
-      cancel_transfer_timeout();
-    }
+    // if (cancel_transfer_timeout) {
+    //   cancel_transfer_timeout();
+    // }
     co_await remote_stream->Close(false);
   }
 }
