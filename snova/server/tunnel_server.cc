@@ -39,17 +39,28 @@
 #include "snova/util/flags.h"
 namespace snova {
 
-using TunnelServerTable = absl::flat_hash_map<uint64_t, TCPServerSocketPtr>;
+struct TunnelServer {
+  std::string addr;
+  uint64_t id;
+  std::string tunnel_addr;
+  TCPServerSocketPtr server;
+};
+using TunnelServerTable = absl::flat_hash_map<uint64_t, TunnelServer>;
+using TunnelServerAddrIdTable = absl::flat_hash_map<std::string, uint64_t>;
 static TunnelServerTable g_tunnel_servers;
+static TunnelServerAddrIdTable g_tunnel_server_addr2ids;
 static uint64_t g_tunnel_server_id_seed = 1;
 
 void close_tunnel_server(uint32_t server_id) {
   auto found = g_tunnel_servers.find(server_id);
   if (found != g_tunnel_servers.end()) {
-    TCPServerSocketPtr server = found->second;
+    TunnelServer& tunnel_server = found->second;
+    TCPServerSocketPtr server = tunnel_server.server;
+    std::string server_addr = tunnel_server.addr;
     server->cancel();
     server->close();
     g_tunnel_servers.erase(found);
+    g_tunnel_server_addr2ids.erase(server_addr);
   }
 }
 
@@ -80,31 +91,54 @@ static ::asio::awaitable<void> server_loop(TCPServerSocketPtr server, NetAddress
 
 asio::awaitable<TunnelServerListenResult> start_tunnel_server(const NetAddress& listen_addr,
                                                               const NetAddress& dst_addr) {
-  SNOVA_INFO("Start tunnel server listen on address [{}].", listen_addr.String());
+  std::string server_addr = listen_addr.String();
+  auto exist_tunnel_id_found = g_tunnel_server_addr2ids.find(server_addr);
+  if (exist_tunnel_id_found != g_tunnel_server_addr2ids.end()) {
+    uint64_t exist_id = exist_tunnel_id_found->second;
+    auto server_found = g_tunnel_servers.find(exist_id);
+    if (server_found != g_tunnel_servers.end()) {
+      TunnelServer& exist_server = server_found->second;
+      if (exist_server.tunnel_addr == dst_addr.String()) {
+        co_return TunnelServerListenResult{exist_server.id, std::error_code{}};
+      } else {
+        co_return TunnelServerListenResult{0, std::make_error_code(std::errc::address_in_use)};
+      }
+    }
+  }
+
+  SNOVA_INFO("Start tunnel server listen on address [{}].", server_addr);
   auto ex = co_await asio::this_coro::executor;
   ::asio::ip::tcp::endpoint endpoint;
   auto resolve_ec = co_await listen_addr.GetEndpoint(&endpoint);
   if (resolve_ec) {
     co_return TunnelServerListenResult{0, resolve_ec};
   }
+
   ::asio::ip::tcp::acceptor acceptor(ex);
   acceptor.open(endpoint.protocol());
   acceptor.set_option(::asio::socket_base::reuse_address(true));
   std::error_code ec;
   acceptor.bind(endpoint, ec);
   if (ec) {
-    SNOVA_ERROR("Failed to bind {} with error:{}", listen_addr.String(), ec.message());
+    SNOVA_ERROR("Failed to bind {} with error:{}", server_addr, ec.message());
     co_return TunnelServerListenResult{0, ec};
   }
   acceptor.listen(::asio::socket_base::max_listen_connections, ec);
   if (ec) {
-    SNOVA_ERROR("Failed to listen {} with error:{}", listen_addr.String(), ec.message());
+    SNOVA_ERROR("Failed to listen {} with error:{}", server_addr, ec.message());
     co_return TunnelServerListenResult{0, ec};
   }
   TCPServerSocketPtr server_socket = std::make_shared<TCPServerSocket>(std::move(acceptor));
   uint64_t server_id = g_tunnel_server_id_seed;
   g_tunnel_server_id_seed++;
-  g_tunnel_servers[server_id] = server_socket;
+  TunnelServer tunnel_server;
+  tunnel_server.server = server_socket;
+  tunnel_server.tunnel_addr = dst_addr.String();
+  tunnel_server.addr = server_addr;
+  tunnel_server.id = server_id;
+
+  g_tunnel_servers[server_id] = tunnel_server;
+  g_tunnel_server_addr2ids[server_addr] = server_id;
   NetAddress tunnel_dst_addr = dst_addr;
   ::asio::co_spawn(ex, server_loop(server_socket, std::move(tunnel_dst_addr)), ::asio::detached);
   co_return TunnelServerListenResult{server_id, std::error_code{}};
