@@ -48,7 +48,7 @@ std::shared_ptr<MuxClient>& MuxClient::GetInstance() {
   return g_instance;
 }
 
-asio::awaitable<std::error_code> MuxClient::NewConnection(uint32_t idx, bool try_open_tunnel) {
+asio::awaitable<std::error_code> MuxClient::NewConnection(uint32_t idx) {
   if (idx >= remote_session_->conns.size()) {
     co_return std::make_error_code(std::errc::invalid_argument);
   }
@@ -112,13 +112,11 @@ asio::awaitable<std::error_code> MuxClient::NewConnection(uint32_t idx, bool try
   }
   SNOVA_INFO("[{}]Success to connect:{}", idx, remote_mux_address_->String());
 
-  if (try_open_tunnel) {
-    for (const auto& tunnel_opt : GlobalFlags::GetIntance()->GetRemoteTunnelOptions()) {
-      bool success = co_await conn->OpenTunnel(tunnel_opt.remote_port, tunnel_opt.local_host,
-                                               tunnel_opt.local_port, true, false);
-      if (!success) {
-        co_return std::make_error_code(std::errc::invalid_argument);
-      }
+  for (const auto& tunnel_opt : GlobalFlags::GetIntance()->GetRemoteTunnelOptions()) {
+    bool success = co_await conn->OpenTunnel(tunnel_opt.remote_port, tunnel_opt.local_host,
+                                             tunnel_opt.local_port, true, false);
+    if (!success) {
+      co_return std::make_error_code(std::errc::invalid_argument);
     }
   }
 
@@ -162,13 +160,13 @@ asio::awaitable<std::error_code> MuxClient::Init(const std::string& user,
   cipher_method_ = cipher_method;
   cipher_key_ = cipher_key;
 
-  auto ec = co_await NewConnection(0, true);
+  auto ec = co_await NewConnection(0);
   if (ec) {
     co_return ec;
   }
 
   for (uint32_t i = 1; i < g_conn_num_per_server; i++) {
-    co_await NewConnection(i, false);
+    co_await NewConnection(i);
   }
   auto ex = co_await asio::this_coro::executor;
   ::asio::co_spawn(ex, CheckConnections(), ::asio::detached);
@@ -184,7 +182,7 @@ asio::awaitable<void> MuxClient::CheckConnections() {
     for (uint32_t i = 0; i < g_conn_num_per_server; i++) {
       auto& conn = remote_session_->conns[i];
       if (!conn) {
-        co_await NewConnection(i, false);
+        co_await NewConnection(i);
       } else {
         uint32_t now = time(nullptr);
         conn->ResetCounter(now);
