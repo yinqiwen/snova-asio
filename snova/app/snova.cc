@@ -93,7 +93,6 @@ int main(int argc, char** argv) {
   bool alsologtostderr = false;
   app.add_option("--alsologtostderr", alsologtostderr, "Also log to stderr");
 
-  std::string listen = "0.0.0.0:48100";
   std::vector<std::string> multi_listens;
   app.add_option("--listen", multi_listens, "Listen address");
 
