@@ -72,7 +72,7 @@ If you want use server E as the proxy exit server, but server E has no right to 
 
 First, start middle server on server M:   
 ```bash
-./snova --middle 1 --listen :48100  --client_cipher_key my_test_cipher_key
+./snova --middle 1 --listen :48100  --server_cipher_key my_test_cipher_key
 ```
 
 Second, start exit server on server E:
@@ -97,7 +97,7 @@ First, start exit server on remote machine C:
 Second, start middle server on remote machine B:
 ```bash
 # the remote address can be set to middle server ip:port
-./snova --middle 1 --listen :48100  --client_cipher_key my_test_cipher_key --remote <exit_node_ip>:<exit_node_port>
+./snova --middle 1 --listen :48100 --server_cipher_key my_test_cipher_key --client_cipher_key my_test_cipher_key --remote <exit_node_ip>:<exit_node_port>
 ```
 You can repeate this step if you want more middle servers.
 

@@ -38,7 +38,7 @@
 #include "snova/mux/mux_connection.h"
 #include "snova/util/stat.h"
 namespace snova {
-
+constexpr uint32_t kMuxConnTypeNum = 2;
 struct MuxSession : public std::enable_shared_from_this<MuxSession> {
   using MuxConnArray = std::vector<MuxConnectionPtr>;
   MuxConnArray conns;
@@ -51,7 +51,7 @@ using MuxSessionPtr = std::shared_ptr<MuxSession>;
 struct UserMuxConn {
   using MuxConnTable = absl::flat_hash_map<uint64_t, MuxSessionPtr>;
   std::string user;
-  MuxConnTable sessions[2];  // 0:entry 1:exit
+  MuxConnTable sessions[kMuxConnTypeNum];  // 0:entry 1:exit
 };
 
 using UserMuxConnPtr = std::shared_ptr<UserMuxConn>;

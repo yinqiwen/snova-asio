@@ -114,7 +114,7 @@ void MuxConnManager::RegisterStat() {
 
 void MuxConnManager::ReportStatInfo(StatValues& stats) {
   for (const auto& [user, user_conn] : mux_conns_) {
-    for (size_t i = 0; i < 3; i++) {
+    for (size_t i = 0; i < kMuxConnTypeNum; i++) {
       auto& session_table = user_conn->sessions[i];
       if (session_table.empty()) {
         continue;
