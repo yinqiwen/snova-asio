@@ -50,8 +50,16 @@ cc_library(
         "//snova/io",
         "//snova/log:log_api",
         "//snova/util:endian",
-        "@com_github_mbedtls//:mbedtls",
-    ],
+        # "@com_github_mbedtls//:mbedtls",
+    ] + select({
+        "@bazel_tools//src/conditions:windows": [
+            "@local_windows_borringssl//:headers",
+            "@local_windows_borringssl//:ssl",
+        ],
+        "//conditions:default": [
+            "@com_github_google_borringssl//:ssl",
+        ],
+    }),
 )
 
 # cc_test(

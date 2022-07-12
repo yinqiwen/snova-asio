@@ -10,14 +10,27 @@ case "${unameOut}" in
 esac
 
 platform="linux_musl_x64"
+gcc_opts="--copt=-O2"
 if [ "$#" -ge 1 ]; then
     arch=$1
     case "${arch}" in
-        amd64)       platform="linux_musl_x64";;
-        arm_eabi)    platform="linux_musl_arm_eabi";;
-        arm_eabihf)  platform="linux_musl_arm_eabihf";;
-        aarch64)     platform="linux_musl_aarch64";;
-        *)           platform="linux_musl_x64";; 
+        x64)         
+          platform="linux_musl_x64"
+          ;;
+        arm_eabi)    
+          platform="linux_musl_arm_eabi"
+          gcc_opts="--copt=-Os --copt=-Wno-stringop-overflow --per_file_copt=.*/curve25519.c@-DOPENSSL_NO_ASM"
+          ;;
+        arm_eabihf)  
+          platform="linux_musl_arm_eabihf"
+          gcc_opts="--copt=-Os --copt=-Wno-stringop-overflow"
+          ;;
+        aarch64)     
+          platform="linux_musl_aarch64"
+          ;;
+        *)           
+          platform="linux_musl_x64"
+          ;; 
 esac
 fi
 
@@ -25,16 +38,19 @@ echo "${BUILD_VERSION}" "${machine}" "${arch}"
 
 if [ "$machine" = "linux" ]
 then
-    bazel build  --features=fully_static_link  --cxxopt=-std=c++20 --cxxopt=-DSNOVA_VERSION="${BUILD_VERSION}" --incompatible_enable_cc_toolchain_resolution --platforms=//toolchains:"${platform}" //...
+    # shellcheck disable=SC2086
+    bazel --bazelrc=bazelrc.linux build  ${gcc_opts} --stripopt=--strip-all --cxxopt=-DSNOVA_VERSION="${BUILD_VERSION}" --platforms=//toolchains:"${platform}" //snova/app:snova.stripped
+    mv ./bazel-bin/snova/app/snova.stripped ./bazel-bin/snova/app/snova
 elif [ "$machine" = "windows" ]
 then
+    vcpkg install boringssl:x64-windows-static
     export MSYS2_ARG_CONV_EXCL="*"
-    bazel.exe build --features=fully_static_link --cxxopt=/O2 --enable_runfiles --cxxopt=/std:c++20  --cxxopt=/GL --linkopt=/LTCG --cxxopt=/DSNOVA_VERSION="${BUILD_VERSION}" //...
+    bazel.exe --bazelrc=bazelrc.windows build --cxxopt=/DSNOVA_VERSION="${BUILD_VERSION}"  //...
 else
     if [ "$(uname -m)" = "arm64" ]; then
-        bazel build --copt=-flto --linkopt=-flto --cxxopt=-std=c++20  //...
+        bazel --bazelrc=bazelrc.macos build --cxxopt=-DSNOVA_VERSION="${BUILD_VERSION}" //...
     else
-        bazel build --features=fully_static_link --copt=-flto --linkopt=-flto --cxxopt=-std=c++20 --cxxopt=-DSNOVA_VERSION="${BUILD_VERSION}" //...
+        bazel --bazelrc=bazelrc.macos build --features=fully_static_link  --cxxopt=-DSNOVA_VERSION="${BUILD_VERSION}" //...
     fi
 fi
 

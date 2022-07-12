@@ -31,8 +31,15 @@ cc_library(
     deps = [
         ":io",
         "//snova/log:log_api",
-        "@com_github_google_borringssl//:ssl",
-    ],
+    ] + select({
+        "@bazel_tools//src/conditions:windows": [
+            "@local_windows_borringssl//:headers",
+            "@local_windows_borringssl//:ssl",
+        ],
+        "//conditions:default": [
+            "@com_github_google_borringssl//:ssl",
+        ],
+    }),
 )
 
 cc_library(
@@ -44,8 +51,15 @@ cc_library(
         ":io",
         "//snova/log:log_api",
         "//snova/util:net_helper",
-        "@com_github_google_borringssl//:ssl",
-    ],
+    ] + select({
+        "@bazel_tools//src/conditions:windows": [
+            "@local_windows_borringssl//:headers",
+            "@local_windows_borringssl//:ssl",
+        ],
+        "//conditions:default": [
+            "@com_github_google_borringssl//:ssl",
+        ],
+    }),
 )
 
 cc_test(

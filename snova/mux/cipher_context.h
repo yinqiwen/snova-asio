@@ -31,7 +31,8 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "mbedtls/cipher.h"
+#include "openssl/aead.h"
+// #include "mbedtls/cipher.h"
 #include "snova/io/io.h"
 #include "snova/mux/mux_event.h"
 namespace snova {
@@ -47,16 +48,20 @@ class CipherContext {
 
  private:
   CipherContext();
-  mbedtls_cipher_type_t cipher_type_;
-  mbedtls_cipher_context_t encrypt_ctx_;
-  mbedtls_cipher_context_t decrypt_ctx_;
+  // const EVP_AEAD* cipher_aead_ = nullptr;
+  EVP_AEAD_CTX* encrypt_ctx_ = nullptr;
+  EVP_AEAD_CTX* decrypt_ctx_ = nullptr;
+  uint64_t encrypt_iv_ = 0;
+  uint64_t decrypt_iv_ = 0;
+  size_t cipher_nonce_len_ = 0;
+  size_t cipher_tag_len_ = 0;
+  std::string cipher_key_;
+
+  // mbedtls_cipher_type_t cipher_type_;
+  // mbedtls_cipher_context_t encrypt_ctx_;
+  // mbedtls_cipher_context_t decrypt_ctx_;
   std::vector<uint8_t> encode_buffer_;
   std::vector<uint8_t> decode_buffer_;
-  std::string cipher_key_;
-  uint64_t encrypt_iv_;
-  uint64_t decrypt_iv_;
-  size_t iv_len_;
-  size_t cipher_tag_len_;
 };
 
 }  // namespace snova

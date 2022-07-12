@@ -437,7 +437,7 @@ asio::awaitable<bool> MuxConnection::Write(std::unique_ptr<MuxEvent>&& write_ev)
   co_await write_mutex_.Unlock();
   // co_await write_mutex_.unlock();
   if (ec) {
-    SNOVA_ERROR("Write event:{} failed with error:{}", write_ev->head.type, ec);
+    SNOVA_ERROR("Write event:{}/{} failed with error:{}", write_ev->head.type, wbuffer.size(), ec);
     co_return false;
   }
   send_bytes_ += wbuffer.size();

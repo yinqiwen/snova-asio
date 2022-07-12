@@ -69,21 +69,59 @@ cc_library(
         build_file = clean_dep("//:bazel/spdlog.BUILD"),
     )
 
-    mbedtls_ver = kwargs.get("mbedtls_ver", "3.1.0")
-    mbedtls_name = "mbedtls-{ver}".format(ver = mbedtls_ver)
-    http_archive(
-        name = "com_github_mbedtls",
-        strip_prefix = mbedtls_name,
-        urls = [
-            "https://github.com/Mbed-TLS/mbedtls/archive/v{ver}.tar.gz".format(ver = mbedtls_ver),
-        ],
-        build_file = clean_dep("//:bazel/mbedtls.BUILD"),
-    )
+    # mbedtls_ver = kwargs.get("mbedtls_ver", "3.1.0")
+    # mbedtls_name = "mbedtls-{ver}".format(ver = mbedtls_ver)
+    # http_archive(
+    #     name = "com_github_mbedtls",
+    #     strip_prefix = mbedtls_name,
+    #     urls = [
+    #         "https://github.com/Mbed-TLS/mbedtls/archive/v{ver}.tar.gz".format(ver = mbedtls_ver),
+    #     ],
+    #     build_file = clean_dep("//:bazel/mbedtls.BUILD"),
+    # )
 
-    git_repository(
+    new_git_repository(
         name = "com_github_google_borringssl",
         branch = "master-with-bazel",
         remote = "https://github.com/google/boringssl.git",
+        build_file = clean_dep("//:bazel/boringssl.BUILD"),
+    )
+
+    _BORINGSSL_BUILD_FILE = """
+cc_library(
+    name = "headers",
+    hdrs = glob([
+        "include/openssl/**",
+    ]),
+    includes=["./include"],
+    visibility = [ "//visibility:public" ],
+)
+cc_import(
+    name = "crypto",
+    static_library = "lib/crypto.lib",
+    visibility = [ "//visibility:public" ],
+)
+cc_import(
+    name = "ssl",
+    static_library = "lib/ssl.lib",
+    visibility = [ "//visibility:public" ],
+)
+"""
+
+    native.new_local_repository(
+        name = "local_windows_borringssl",
+        path = "C:\\vcpkg\\installed\\x64-windows-static",
+        build_file_content = _BORINGSSL_BUILD_FILE,
+    )
+
+    http_archive(
+        name = "nasm",
+        strip_prefix = "nasm-2.15.05",
+        build_file = clean_dep("//:bazel/nasm.BUILD"),
+        urls = [
+            "https://mirror.bazel.build/www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/nasm-2.15.05-win64.zip",
+            "https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/nasm-2.15.05-win64.zip",
+        ],
     )
 
     gtest_ver = kwargs.get("gtest_ver", "1.11.0")

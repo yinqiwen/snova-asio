@@ -32,7 +32,7 @@
 
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/io/tcp_socket.h"
-// #include "snova/io/tls_socket.h"
+#include "snova/io/tls_socket.h"
 #include "snova/io/ws_socket.h"
 #include "snova/log/log_macros.h"
 #include "snova/util/flags.h"
@@ -76,17 +76,17 @@ asio::awaitable<std::error_code> MuxClient::NewConnection(uint32_t idx) {
       co_return ec;
     }
   }
-  IOConnectionPtr raw_io_conn = std::make_unique<TcpSocket>(std::move(socket));
-  // if (remote_mux_address_->schema == "tls" || remote_mux_address_->schema == "wss") {
-  //   auto tls_conn = std::make_unique<TlsSocket>(std::move(socket));
-  //   auto handshake_ec = co_await tls_conn->ClientHandshake();
-  //   if (handshake_ec) {
-  //     co_return handshake_ec;
-  //   }
-  //   raw_io_conn = std::move(tls_conn);
-  // } else {
-  //   raw_io_conn = std::make_unique<TcpSocket>(std::move(socket));
-  // }
+  IOConnectionPtr raw_io_conn;
+  if (remote_mux_address_->schema == "tls" || remote_mux_address_->schema == "wss") {
+    auto tls_conn = std::make_unique<TlsSocket>(std::move(socket));
+    auto handshake_ec = co_await tls_conn->ClientHandshake();
+    if (handshake_ec) {
+      co_return handshake_ec;
+    }
+    raw_io_conn = std::move(tls_conn);
+  } else {
+    raw_io_conn = std::make_unique<TcpSocket>(std::move(socket));
+  }
   IOConnectionPtr io_conn;
   if (remote_mux_address_->schema == "ws" || remote_mux_address_->schema == "wss") {
     auto ws_conn = std::make_unique<WebSocket>(std::move(raw_io_conn));

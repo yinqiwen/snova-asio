@@ -11,8 +11,6 @@ rules_foreign_cc_dependencies()
 
 register_toolchains(
     "//toolchains:x64_linux_musl_gcc_compile_toolchain",
-    "//toolchains:armv7l_linux_musleabihf_gcc_compile_toolchain",
-    "//toolchains:armv5l_linux_musleabi_gcc_compile_toolchain",
     "//toolchains:arm_linux_musleabi_gcc_compile_toolchain",
     "//toolchains:arm_linux_musleabihf_gcc_compile_toolchain",
     "//toolchains:aarch64_linux_musl_gcc_compile_toolchain",

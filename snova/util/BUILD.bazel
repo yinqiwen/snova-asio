@@ -168,5 +168,13 @@ cc_library(
         "misc_helper.h",
     ],
     copts = SNOVA_DEFAULT_COPTS,
-    deps = ["@com_github_mbedtls//:mbedtls"],
+    deps = select({
+        "@bazel_tools//src/conditions:windows": [
+            "@local_windows_borringssl//:headers",
+            "@local_windows_borringssl//:crypto",
+        ],
+        "//conditions:default": [
+            "@com_github_google_borringssl//:crypto",
+        ],
+    }),
 )
