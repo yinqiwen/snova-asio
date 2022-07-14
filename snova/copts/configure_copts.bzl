@@ -26,10 +26,10 @@ SNOVA_DEFAULT_COPTS = select({
         # "-fcoroutines",
         # "-DASIO_HAS_IO_URING",
         # "-DASIO_DISABLE_EPOLL",
-        "-O3",
-        "-fvisibility=hidden",
-        "-ffunction-sections",
-        "-fdata-sections",
+        # "-O2",
+        # "-fvisibility=hidden",
+        # "-ffunction-sections",
+        # "-fdata-sections",
         # "-g",
     ],
 })
@@ -40,6 +40,7 @@ SNOVA_DEFAULT_LINKOPTS = select({
     ],
     "@bazel_tools//src/conditions:darwin": ["-dead_strip"],
     "//conditions:default": [
-        "-Wl,--gc-sections,-s",
+        "-Wl,--gc-sections",
+        "-Wl,--strip-all",
     ],
 })

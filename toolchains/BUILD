@@ -28,36 +28,6 @@ platform(
     ],
 )
 
-constraint_value(
-    name = "armv5l",
-    constraint_setting = "@platforms//cpu",
-)
-
-constraint_value(
-    name = "armv7l",
-    constraint_setting = "@platforms//cpu",
-)
-
-platform(
-    name = "linux_musl_armv7l",
-    constraint_values = [
-        # "@platforms//cpu:armv7",
-        ":armv7l",
-        "@platforms//os:linux",
-        ":musl",
-    ],
-)
-
-platform(
-    name = "linux_musl_armv5l",
-    constraint_values = [
-        # "@platforms//cpu:armv7",
-        ":armv5l",
-        "@platforms//os:linux",
-        ":musl",
-    ],
-)
-
 platform(
     name = "linux_musl_arm_eabi",
     constraint_values = [
@@ -103,42 +73,6 @@ toolchain(
 )
 
 # toolchain_type(name = "armv7l_linux_musleabihf_toolchain_type")
-
-toolchain(
-    name = "armv7l_linux_musleabihf_gcc_compile_toolchain",
-    exec_compatible_with = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:linux",
-    ],
-    target_compatible_with = [
-        # "@platforms//cpu:armv7",
-        ":armv7l",
-        "@platforms//os:linux",
-    ],
-    toolchain = select({
-        "//:local_musl": "@local_armv7l_linux_musleabihf//:cc_toolchain",
-        "//conditions:default": "@armv7l_linux_musleabihf//:cc_toolchain",
-    }),
-    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
-)
-
-toolchain(
-    name = "armv5l_linux_musleabi_gcc_compile_toolchain",
-    exec_compatible_with = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:linux",
-    ],
-    target_compatible_with = [
-        # "@platforms//cpu:armv7",
-        ":armv5l",
-        "@platforms//os:linux",
-    ],
-    toolchain = select({
-        "//:local_musl": "@local_armv5l_linux_musleabi//:cc_toolchain",
-        "//conditions:default": "@armv5l_linux_musleabi//:cc_toolchain",
-    }),
-    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
-)
 
 toolchain(
     name = "arm_linux_musleabi_gcc_compile_toolchain",

@@ -3,8 +3,8 @@
 A lightweight network proxy tool write by c++20 for low-end boxes or embedded devices.
 
 ## Features
-- Forward Proxy
-- Reverse Proxy
+- Forward Proxy(tcp)
+- Reverse Proxy(tcp)
 
 ## Usage
 Full command options: 

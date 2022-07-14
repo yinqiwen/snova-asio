@@ -46,6 +46,10 @@
 #define ERR_PB_ENCODE -1007
 #define ERR_PB_DECODE -1008
 #define ERR_EMPTY_MUX_SESSION -1009
+#define ERR_CIPHER_HEADER_ENCRYPT -1010
+#define ERR_CIPHER_HEADER_DECRYPT -1011
+#define ERR_CIPHER_BODY_ENCRYPT -1012
+#define ERR_CIPHER_BODY_DECRYPT -1013
 
 namespace snova {
 static constexpr uint16_t kEventHeadSize = 8;

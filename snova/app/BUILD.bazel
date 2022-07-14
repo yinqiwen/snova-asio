@@ -36,20 +36,6 @@ cc_binary(
 )
 
 # cc_binary(
-#     name = "mbedtls",
-#     srcs = [
-#         "mbedtls.cc",
-#     ],
-#     copts = SNOVA_DEFAULT_COPTS,
-#     linkopts = SNOVA_DEFAULT_LINKOPTS,
-#     linkstatic = 1,
-#     deps = [
-#         "//snova/log:log_api",
-#         "@com_github_mbedtls//:mbedtls",
-#     ],
-# )
-
-# cc_binary(
 #     name = "test",
 #     srcs = [
 #         "test.cc",
@@ -58,5 +44,6 @@ cc_binary(
 #     linkopts = SNOVA_DEFAULT_LINKOPTS,
 #     deps = [
 #         "@asio",
+#         "@com_github_google_borringssl//:ssl",
 #     ],
 # )
