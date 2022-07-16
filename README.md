@@ -5,6 +5,7 @@ A lightweight network proxy tool write by c++20 for low-end boxes or embedded de
 ## Features
 - Forward Proxy(tcp)
 - Reverse Proxy(tcp)
+- DNS Proxy(DoT/DoH)
 
 ## Usage
 Full command options: 

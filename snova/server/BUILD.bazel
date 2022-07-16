@@ -9,6 +9,35 @@ package(
 )
 
 cc_library(
+    name = "dns_proxy_server",
+    srcs = [
+        "dns_proxy_server.cc",
+    ],
+    hdrs = [
+        "dns_proxy_server.h",
+    ],
+    copts = SNOVA_DEFAULT_COPTS,
+    deps = [
+        ":relay",
+        "//snova/io",
+        "//snova/io:io_util",
+        "//snova/io:tls_socket",
+        "//snova/log:log_api",
+        "//snova/util:address",
+        "//snova/util:dns_options",
+        "//snova/util:endian",
+        "//snova/util:flags",
+        "//snova/util:http_helper",
+        "//snova/util:net_helper",
+        "//snova/util:time_wheel",
+        "@asio",
+        "@com_google_absl//absl/cleanup",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
     name = "entry_server",
     srcs = [
         "entry_server.cc",

@@ -50,19 +50,20 @@ PaserAddressResult NetAddress::Parse(const std::string& addr) {
       path = url_part.substr(pos + 1);
     }
   }
+  uint16_t port = 0;
+  absl::string_view host_view;
   std::vector<absl::string_view> host_ports = absl::StrSplit(host_port_part, ':');
   if (host_ports.size() != 2) {
-    // SNOVA_ERROR("{} {}# {}#", schema_url_parts.size(), host_port_part, url_part);
-    return PaserAddressResult{nullptr, std::make_error_code(std::errc::invalid_argument)};
+    host_view = host_port_part;
+  } else {
+    host_view = host_ports[0];
+    try {
+      port = std::stoi(std::string(host_ports[1]));
+    } catch (...) {
+      // SNOVA_ERROR("{}", host_ports[1]);
+      return PaserAddressResult{nullptr, std::make_error_code(std::errc::invalid_argument)};
+    }
   }
-  uint16_t port = 0;
-  try {
-    port = std::stoi(std::string(host_ports[1]));
-  } catch (...) {
-    // SNOVA_ERROR("{}", host_ports[1]);
-    return PaserAddressResult{nullptr, std::make_error_code(std::errc::invalid_argument)};
-  }
-  absl::string_view host_view = host_ports[0];
   if (host_view.empty()) {
     host_view = "0.0.0.0";
   }
@@ -74,6 +75,23 @@ PaserAddressResult NetAddress::Parse(const std::string& addr) {
     net_addr->path.assign(path.data(), path.size());
   }
   net_addr->host.assign(host_view.data(), host_view.size());
+  if (net_addr->schema == "https" || net_addr->schema == "tls" || net_addr->schema == "doh") {
+    if (port == 0) {
+      port = 443;
+    }
+  } else if (net_addr->schema == "http") {
+    if (port == 0) {
+      port = 80;
+    }
+  } else if (net_addr->schema == "dns") {
+    if (port == 0) {
+      port = 53;
+    }
+  } else if (net_addr->schema == "dot") {
+    if (port == 0) {
+      port = 853;
+    }
+  }
   net_addr->port = port;
   return PaserAddressResult{std::move(net_addr), std::error_code{}};
 }
@@ -92,6 +110,10 @@ std::string NetAddress::String() const {
 
 asio::awaitable<std::error_code> NetAddress::GetEndpoint(
     ::asio::ip::tcp::endpoint* endpoint) const {
-  co_return co_await resolve_endpoint(host, port, endpoint);
+  return resolve_endpoint(host, port, endpoint);
+}
+asio::awaitable<std::error_code> NetAddress::GetEndpoint(
+    ::asio::ip::udp::endpoint* endpoint) const {
+  return resolve_endpoint(host, port, endpoint);
 }
 }  // namespace snova

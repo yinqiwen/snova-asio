@@ -22,10 +22,12 @@ cc_binary(
     deps = [
         "//snova/log:log_api",
         "//snova/mux:mux_client",
+        "//snova/server:dns_proxy_server",
         "//snova/server:entry_server",
         "//snova/server:mux_server",
         "//snova/server:tunnel_server",
         "//snova/util:address",
+        "//snova/util:dns_options",
         "//snova/util:flags",
         "//snova/util:misc_helper",
         "//snova/util:stat",

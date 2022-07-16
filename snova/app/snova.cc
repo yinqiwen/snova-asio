@@ -42,10 +42,12 @@
 
 #include "snova/log/log_macros.h"
 #include "snova/mux/mux_client.h"
+#include "snova/server/dns_proxy_server.h"
 #include "snova/server/entry_server.h"
 #include "snova/server/mux_server.h"
 #include "snova/server/tunnel_server.h"
 #include "snova/util/address.h"
+#include "snova/util/dns_options.h"
 #include "snova/util/flags.h"
 #include "snova/util/misc_helper.h"
 #include "snova/util/stat.h"
@@ -142,6 +144,18 @@ int main(int argc, char** argv) {
                  "Remote tunnel options, foramt  <remote port>:<local host>:<local port>, only "
                  "works with exit node.");
 
+  snova::DNSOptions dns_options;
+  auto dns_group = app.add_option_group("dns", "dns proxy options.");
+  std::string ip_range_file;
+  dns_group->add_option("--ip_range_file", ip_range_file, "IP range file for dns proxy");
+  std::string default_ns, trusted_ns;
+  dns_group->add_option("--default_ns", default_ns, "Default nameserver address");
+  dns_group->add_option("--trusted_ns", trusted_ns, "TRusted nameserver address");
+  dns_group->add_option("--trusted_ns_domains", dns_options.trusted_ns_domains,
+                        "Trusted nameserver domains.");
+  dns_group->add_option("--dns_proxy_timeout", snova::g_dns_query_timeout_msecs,
+                        "DNS proxy timeout(mills), default 800ms.");
+
   CLI11_PARSE(app, argc, argv);
 
   if (!log_file.empty()) {
@@ -160,6 +174,39 @@ int main(int argc, char** argv) {
     spdlog::register_logger(root_logger);
     // Set default logger.
     spdlog::set_default_logger(root_logger);
+  }
+
+  if (!default_ns.empty()) {
+    auto result = snova::NetAddress::Parse(default_ns);
+    if (result.second) {
+      error_exit(
+          fmt::format("Failed to parse dns address:{} with error:{}", default_ns, result.second));
+    } else {
+      dns_options.default_ns = std::move(result.first);
+      if (0 == dns_options.default_ns->port) {
+        dns_options.default_ns->port = 53;
+      }
+      SNOVA_INFO("DNS default address:{}", default_ns);
+    }
+  }
+  if (!trusted_ns.empty()) {
+    auto result = snova::NetAddress::Parse(trusted_ns);
+    if (result.second) {
+      error_exit(
+          fmt::format("Failed to parse dns address:{} with error:{}", trusted_ns, result.second));
+    } else {
+      dns_options.trusted_ns = std::move(result.first);
+      if (0 == dns_options.trusted_ns->port) {
+        dns_options.trusted_ns->port = 53;
+      }
+      SNOVA_INFO("DNS truested address:{}", trusted_ns);
+    }
+  }
+  if (!ip_range_file.empty()) {
+    if (!dns_options.LoadIPRangeFromFile(ip_range_file)) {
+      error_exit("Failed to load ip range file");
+    }
+    SNOVA_INFO("Load {} ip ranges from {}", dns_options.ip_range_map.size(), ip_range_file);
   }
 
   if (!proxy_server.empty()) {
@@ -253,11 +300,24 @@ int main(int argc, char** argv) {
         ::asio::detached);
   }
   std::vector<std::unique_ptr<snova::NetAddress>> listen_addrs;
+  uint32_t dns_server_count = 0;
   for (const auto& v : multi_listens) {
     auto result = snova::NetAddress::Parse(v);
     if (result.second) {
       error_exit(fmt::format("Failed to parse listen address:{} with error:{}", v, result.second));
     } else {
+      if (result.first->schema == "dns") {
+        if (dns_server_count > 0) {
+          error_exit("Only ONE dns proxy server alllowed.");
+        }
+        if (ip_range_file.empty()) {
+          error_exit("Missing '--ip_range_file' for dns proxy server.");
+        }
+        if (!dns_options.trusted_ns || !dns_options.default_ns) {
+          error_exit("Missing '--default_ns' or '--trusted_ns' for dns proxy server.");
+        }
+        dns_server_count++;
+      }
       listen_addrs.emplace_back(std::move(result.first));
       SNOVA_INFO("Listen address:{}", v);
     }
@@ -271,10 +331,20 @@ int main(int argc, char** argv) {
         is_mux_server = false;
       }
     }
+    bool is_dns_server = listen_addr->schema == "dns";
+    if (is_dns_server) {
+      is_mux_server = false;
+    }
     if (is_mux_server) {
       ::asio::co_spawn(
           ctx, snova::start_mux_server(*listen_addr, server_cipher_method, server_cipher_key),
           ::asio::detached);
+    } else if (is_dns_server) {
+      if (listen_addr->port == 0) {
+        listen_addr->port = 53;
+      }
+      ::asio::co_spawn(ctx, snova::start_dns_proxy_server(*listen_addr, dns_options),
+                       ::asio::detached);
     } else {
       ::asio::co_spawn(ctx, snova::start_entry_server(*listen_addr), ::asio::detached);
     }

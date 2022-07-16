@@ -113,7 +113,11 @@ static ::asio::awaitable<void> handle_conn(::asio::ip::tcp::socket sock,
           retired_conn->Close();
           co_return;
         },
-        [retired_conn]() -> uint32_t { return retired_conn->GetLastActiveUnixSecs(); }, 60);
+        [retired_conn]() -> uint64_t {
+          uint64_t ts = retired_conn->GetLastActiveUnixSecs();
+          return ts * 1000;
+        },
+        60000);
   });
   uint32_t idx = 0;
   MuxConnManager::GetInstance()->Add(mux_user, client_id, mux_conn, &idx);

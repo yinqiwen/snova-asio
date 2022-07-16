@@ -43,6 +43,8 @@ struct NetAddress {
   uint16_t port = 0;
   std::string path;
   asio::awaitable<std::error_code> GetEndpoint(::asio::ip::tcp::endpoint* endpoint) const;
+  asio::awaitable<std::error_code> GetEndpoint(::asio::ip::udp::endpoint* endpoint) const;
+
   std::string String() const;
   static PaserAddressResult Parse(const std::string& addr);
 };

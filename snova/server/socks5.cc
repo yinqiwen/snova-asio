@@ -161,6 +161,6 @@ asio::awaitable<void> handle_socks5_connection(::asio::ip::tcp::socket&& s, IOBu
   relay_ctx.remote_host = std::move(remote_host);
   relay_ctx.remote_port = remote_port;
   relay_ctx.is_tcp = true;
-  co_await relay(std::move(sock), Bytes{}, relay_ctx);
+  co_await relay(std::move(sock), Bytes{read_buffer.data(), rn}, relay_ctx);
 }
 }  // namespace snova

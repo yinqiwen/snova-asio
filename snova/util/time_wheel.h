@@ -36,7 +36,7 @@
 
 namespace snova {
 using TimeoutFunc = std::function<asio::awaitable<void>()>;
-using GetActiveTimeFunc = std::function<uint32_t()>;
+using GetActiveTimeFunc = std::function<uint64_t()>;
 using CancelFunc = std::function<void()>;
 
 struct TimerTask;
@@ -45,17 +45,17 @@ using TimerTaskPtr = std::shared_ptr<TimerTask>;
 class TimeWheel {
  public:
   static std::shared_ptr<TimeWheel>& GetInstance();
-  explicit TimeWheel(uint32_t max_timeout_secs = 600);
-  CancelFunc Add(TimeoutFunc&& func, GetActiveTimeFunc&& active, uint32_t timeout_secs);
-  CancelFunc Add(TimeoutFunc&& func, uint32_t timeout_secs);
+  explicit TimeWheel(uint32_t slot_size = 128);
+  CancelFunc Add(TimeoutFunc&& func, GetActiveTimeFunc&& active, uint64_t timeout_msecs);
+  CancelFunc Add(TimeoutFunc&& func, uint64_t timeout_msecs);
 
   asio::awaitable<void> Run();
 
  private:
+  size_t GetIdxByMillsecs(uint64_t ms);
   CancelFunc DoRegister(const TimerTaskPtr& task);
   using TimerTaskQueue = std::vector<TimerTaskPtr>;
   using TimeWheelQueue = std::vector<TimerTaskQueue>;
   TimeWheelQueue time_wheel_;
-  uint32_t max_timeout_secs_;
 };
 }  // namespace snova
