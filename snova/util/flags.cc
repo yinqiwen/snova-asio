@@ -45,6 +45,7 @@ uint32_t g_connection_max_inactive_secs = 300;
 uint32_t g_tcp_write_timeout_secs = 10;
 uint32_t g_entry_socket_send_buffer_size = 0;
 uint32_t g_entry_socket_recv_buffer_size = 0;
+uint32_t g_dns_query_timeout_msecs = 800;
 
 std::shared_ptr<GlobalFlags>& GlobalFlags::GetIntance() {
   static std::shared_ptr<GlobalFlags> s = std::make_shared<GlobalFlags>();

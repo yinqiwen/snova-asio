@@ -73,7 +73,15 @@ cc_test(
         "//snova/util:http_helper",
         "//snova/util:net_helper",
         "@com_google_googletest//:gtest_main",
-    ],
+    ] + select({
+        "@bazel_tools//src/conditions:windows": [
+            "@local_windows_borringssl//:headers",
+            "@local_windows_borringssl//:ssl",
+        ],
+        "//conditions:default": [
+            "@com_github_google_borringssl//:ssl",
+        ],
+    }),
 )
 
 cc_library(

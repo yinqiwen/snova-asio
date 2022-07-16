@@ -29,55 +29,54 @@
 
 #include "snova/util/time_wheel.h"
 #include <time.h>
+#include <chrono>
 
 #include "asio/experimental/as_tuple.hpp"
 #include "snova/util/flags.h"
 
 namespace snova {
+using std::chrono::milliseconds;
 
 struct TimerTask {
   TimeoutFunc timeout_callback;
   GetActiveTimeFunc get_active_time;
-  uint32_t timeout_secs = 0;
-  uint32_t create_time = 0;
+  uint64_t timeout_msecs = 0;
+  uint64_t create_time = 0;
   bool canceled = false;
 };
 
 std::shared_ptr<TimeWheel>& TimeWheel::GetInstance() {
-  static std::shared_ptr<TimeWheel> g_instance =
-      std::make_shared<TimeWheel>(g_stream_io_timeout_secs + 1);
+  static std::shared_ptr<TimeWheel> g_instance = std::make_shared<TimeWheel>(128);
   return g_instance;
 }
 
-TimeWheel::TimeWheel(uint32_t max_timeout_secs) : max_timeout_secs_(max_timeout_secs) {
-  time_wheel_.resize(max_timeout_secs);
-}
+TimeWheel::TimeWheel(uint32_t slot_size) { time_wheel_.resize(slot_size); }
 
-CancelFunc TimeWheel::Add(TimeoutFunc&& func, GetActiveTimeFunc&& active, uint32_t timeout_secs) {
+CancelFunc TimeWheel::Add(TimeoutFunc&& func, GetActiveTimeFunc&& active, uint64_t timeout_msecs) {
   TimerTaskPtr task = std::make_shared<TimerTask>();
   task->timeout_callback = std::move(func);
   task->get_active_time = std::move(active);
-  task->timeout_secs = timeout_secs;
+  task->timeout_msecs = timeout_msecs;
   return DoRegister(task);
 }
-CancelFunc TimeWheel::Add(TimeoutFunc&& func, uint32_t timeout_secs) {
+CancelFunc TimeWheel::Add(TimeoutFunc&& func, uint64_t timeout_msecs) {
   TimerTaskPtr task = std::make_shared<TimerTask>();
   task->timeout_callback = std::move(func);
-  task->timeout_secs = timeout_secs;
+  task->timeout_msecs = timeout_msecs;
   return DoRegister(task);
 }
 
 CancelFunc TimeWheel::DoRegister(const TimerTaskPtr& rtask) {
   TimerTaskPtr task = rtask;
-  if (task->timeout_secs == 0) {
-    task->timeout_secs = max_timeout_secs_ / 2;
+  if (task->timeout_msecs == 0) {
+    task->timeout_msecs = 500;
   }
-  if (task->timeout_secs > max_timeout_secs_) {
-    task->timeout_secs = max_timeout_secs_;
-  }
-  uint32_t now = time(nullptr);
+  auto now =
+      std::chrono::duration_cast<milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+          .count();
+  // uint32_t now = time(nullptr);
   task->create_time = now;
-  uint32_t idx = (now + task->timeout_secs) % time_wheel_.size();
+  size_t idx = GetIdxByMillsecs(now + task->timeout_msecs);
   auto cancel_func = [task]() {
     task->canceled = true;
     task->timeout_callback = {};
@@ -87,15 +86,19 @@ CancelFunc TimeWheel::DoRegister(const TimerTaskPtr& rtask) {
   return cancel_func;
 }
 
+size_t TimeWheel::GetIdxByMillsecs(uint64_t ms) { return (ms / 10) % time_wheel_.size(); }
+
 asio::awaitable<void> TimeWheel::Run() {
   auto ex = co_await asio::this_coro::executor;
   ::asio::steady_timer timer(ex);
-  std::chrono::milliseconds period(999);
+  std::chrono::milliseconds period(99);  // run every 99ms
   while (true) {
     timer.expires_after(period);
     co_await timer.async_wait(::asio::experimental::as_tuple(::asio::use_awaitable));
-    uint32_t now = time(nullptr);
-    uint32_t idx = now % time_wheel_.size();
+    auto now = std::chrono::duration_cast<milliseconds>(
+                   std::chrono::system_clock::now().time_since_epoch())
+                   .count();
+    size_t idx = GetIdxByMillsecs(now);
     if (time_wheel_[idx].empty()) {
       continue;
     }
@@ -104,14 +107,14 @@ asio::awaitable<void> TimeWheel::Run() {
       if (task->canceled) {
         continue;
       }
-      uint32_t active_time = task->create_time;
+      uint64_t active_time = task->create_time;
       if (task->get_active_time) {
         active_time = task->get_active_time();
       }
-      if (now - active_time > task->timeout_secs) {
+      if (now - active_time > task->timeout_msecs) {
         co_await task->timeout_callback();
       } else {
-        uint32_t next_idx = ((active_time + task->timeout_secs + 1) % time_wheel_.size());
+        uint32_t next_idx = GetIdxByMillsecs(active_time + task->timeout_msecs + 100);
         time_wheel_[next_idx].emplace_back(std::move(task));
       }
     }

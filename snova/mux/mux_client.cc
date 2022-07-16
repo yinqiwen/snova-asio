@@ -201,11 +201,12 @@ asio::awaitable<void> MuxClient::CheckConnections() {
             retired_conn->Close();
             co_return;
           };
-          auto get_active_time = [retired_conn]() -> uint32_t {
-            return retired_conn->GetLastActiveUnixSecs();
+          auto get_active_time = [retired_conn]() -> uint64_t {
+            uint64_t ts = retired_conn->GetLastActiveUnixSecs();
+            return ts * 1000;
           };
           TimeWheel::GetInstance()->Add(std::move(timeout_callback), std::move(get_active_time),
-                                        15);
+                                        15000);
         }
       }
     }

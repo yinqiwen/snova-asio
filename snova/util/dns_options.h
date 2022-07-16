@@ -31,41 +31,28 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "asio.hpp"
-#include "asio/experimental/as_tuple.hpp"
-#include "asio/ssl.hpp"
-#include "snova/io/io.h"
-#include "snova/util/net_helper.h"
-namespace snova {
-using ASIOTlsSocket = ::asio::ssl::stream<::asio::ip::tcp::socket>;
-using ASIOTlsSocketExecutor = typename ASIOTlsSocket::executor_type;
-class TlsSocket : public IOConnection {
- public:
-  explicit TlsSocket(::asio::ip::tcp::socket&& sock);
-  explicit TlsSocket(const ASIOTlsSocketExecutor& ex);
-  void SetHost(const std::string& v) { tls_host_ = v; }
-  asio::any_io_executor GetExecutor() override;
-  asio::awaitable<std::error_code> ClientHandshake();
-  asio::awaitable<std::error_code> AsyncConnect(const ::asio::ip::tcp::endpoint& endpoint);
-  asio::awaitable<std::error_code> AsyncConnect(const std::string& host, uint16_t port);
-  asio::awaitable<IOResult> AsyncWrite(const asio::const_buffer& buffers) override {
-    co_return co_await DoAsyncWrite(buffers);
-  }
-  asio::awaitable<IOResult> AsyncWrite(const std::vector<::asio::const_buffer>& buffers) override {
-    co_return co_await DoAsyncWrite(buffers);
-  }
-  asio::awaitable<IOResult> AsyncRead(const asio::mutable_buffer& buffers) override;
-  void Close() override;
+#include "absl/container/btree_map.h"
+#include "asio/ip/address_v4_range.hpp"
+#include "asio/ip/tcp.hpp"
+#include "asio/ip/udp.hpp"
+#include "snova/util/address.h"
 
- private:
-  template <typename T>
-  asio::awaitable<IOResult> DoAsyncWrite(const T& buffers) {
-    auto [ec, n] = co_await ::asio::async_write(
-        tls_socket_, buffers, ::asio::experimental::as_tuple(::asio::use_awaitable));
-    co_return IOResult{n, ec};
-  }
-  ::asio::ssl::context tls_ctx_;
-  ASIOTlsSocket tls_socket_;
-  std::string tls_host_;
+namespace snova {
+struct DNSOptions {
+  ::asio::ip::udp::endpoint default_ns_endpoint;
+  ::asio::ip::udp::endpoint trusted_ns_endpoint;
+  ::asio::ip::tcp::endpoint trusted_ns_tcp_endpoint;
+  std::unique_ptr<NetAddress> default_ns;
+  std::unique_ptr<NetAddress> trusted_ns;
+
+  std::vector<std::string> trusted_ns_domains;
+  // std::vector<::asio::ip::address_v4_range> ip_ranges;
+  absl::btree_map<uint32_t, ::asio::ip::address_v4_range> ip_range_map;
+
+  asio::awaitable<std::error_code> Init();
+
+  bool LoadIPRangeFromFile(const std::string& file);
+
+  bool MatchIPRanges(uint32_t ip) const;
 };
 }  // namespace snova

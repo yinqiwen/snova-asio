@@ -146,6 +146,7 @@ int CipherContext::Encrypt(std::unique_ptr<MuxEvent>& in, MutableBytes& out) {
   if (0 != rc) {
     return rc;
   }
+
   in->head.len = body_buffer->size();
   MutableBytes head_buffer(encode_buffer_.data(), kEventHeadSize);
   rc = in->head.Encode(head_buffer);
@@ -169,7 +170,7 @@ int CipherContext::Encrypt(std::unique_ptr<MuxEvent>& in, MutableBytes& out) {
                          cipher_nonce_len_, (const uint8_t*)head_buffer.data(), head_buffer.size(),
                          nullptr, 0);
   if (1 != rc) {
-    SNOVA_ERROR("Failed to encrypt header with rc:{}", rc);
+    SNOVA_ERROR("Failed to encrypt header with rc:{}, head_buffer size:{}", rc, head_buffer.size());
     return ERR_CIPHER_HEADER_ENCRYPT;
   }
   size_t header_len = olen;
@@ -189,7 +190,8 @@ int CipherContext::Encrypt(std::unique_ptr<MuxEvent>& in, MutableBytes& out) {
                              nonce.data(), cipher_nonce_len_, (const uint8_t*)body_buffer->data(),
                              body_buffer->size(), nullptr, 0);
       if (1 != rc) {
-        SNOVA_ERROR("Failed to encrypt header with rc:{}", rc);
+        SNOVA_ERROR("Failed to encrypt body with rc:{}, body size:{}, output size:{}", rc,
+                    body_buffer->size(), out.size() - header_len);
         return ERR_CIPHER_BODY_ENCRYPT;
       }
       body_len = olen;

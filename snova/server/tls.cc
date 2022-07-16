@@ -51,13 +51,9 @@ asio::awaitable<bool> handle_tls_connection(
     co_return false;
   }
 
-  SNOVA_INFO("Retrive SNI:{} from tls connection.", remote_host);
-  if (remote_host == "courier.push.apple.com") {
+  SNOVA_INFO("Retrive SNI:{} from tls connection with port:{}", remote_host, remote_port);
+  if (remote_host == "courier.push.apple.com") {  // special case
     co_return false;
-    // remote_host =
-    // if (orig_remote_endpoint) {
-    //   remote_host = orig_remote_endpoint->address().to_string();
-    // }
   }
   RelayContext relay_ctx;
   relay_ctx.user = GlobalFlags::GetIntance()->GetUser();

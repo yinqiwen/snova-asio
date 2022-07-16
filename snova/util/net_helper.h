@@ -28,11 +28,13 @@
  */
 
 #pragma once
+#include <array>
 #include <memory>
 #include <optional>
 #include <string>
 #include <system_error>
 #include <utility>
+#include <vector>
 #include "asio.hpp"
 namespace snova {
 
@@ -52,4 +54,23 @@ asio::awaitable<std::error_code> connect_remote_via_http_proxy(SocketRef socket,
                                                                uint16_t proxy_port);
 asio::awaitable<std::error_code> resolve_endpoint(const std::string& host, uint16_t port,
                                                   ::asio::ip::tcp::endpoint* endpoint);
+asio::awaitable<std::error_code> resolve_endpoint(const std::string& host, uint16_t port,
+                                                  ::asio::ip::udp::endpoint* endpoint);
+
+struct DNSAnswer {
+  uint16_t nm;
+  uint16_t type;
+  uint16_t cls;
+  uint16_t ttl1;  // if using uint32, compiler will pad struct.
+  uint16_t ttl2;
+  uint16_t datalen;
+  asio::ip::address_v4 v4_ip;
+  asio::ip::address_v6 v6_ip;
+  bool IsV4() const;
+  bool IsV6() const;
+};
+int dns_parse_name(const uint8_t* payload, int payload_offset, int payload_len, std::string& name);
+
+int dns_parse_answers(const uint8_t* payload, int payload_offset, int payload_len,
+                      std::vector<DNSAnswer>& answers);
 }  // namespace snova

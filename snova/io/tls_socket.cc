@@ -29,6 +29,7 @@
 #include "snova/io/tls_socket.h"
 #include <string>
 #include <utility>
+#include "openssl/ssl.h"
 
 namespace snova {
 TlsSocket::TlsSocket(::asio::ip::tcp::socket&& sock)
@@ -44,18 +45,37 @@ asio::awaitable<std::error_code> TlsSocket::ClientHandshake() {
   }
   co_return std::error_code{};
 }
-asio::awaitable<std::error_code> TlsSocket::AsyncConnect(const std::string& host, uint16_t port) {
-  ::asio::ip::tcp::endpoint endpoint;
-  auto ec = co_await resolve_endpoint(host, port, &endpoint);
-  if (ec) {
-    co_return ec;
+
+asio::awaitable<std::error_code> TlsSocket::AsyncConnect(
+    const ::asio::ip::tcp::endpoint& endpoint) {
+  // tls_ctx_.set_options(::asio::ssl::context::default_workarounds | ::asio::ssl::context::no_sslv2
+  // |
+  //                      ::asio::ssl::context::no_sslv3 | ::asio::ssl::context::single_dh_use);
+  // tls_ctx_.set_verify_mode(::asio::ssl::verify_none);
+  // tls_socket_.set_verify_mode(::asio::ssl::verify_none);
+
+  if (!tls_host_.empty()) {
+    if (!SSL_set_tlsext_host_name(tls_socket_.native_handle(), tls_host_.c_str())) {
+      std::error_code ec{static_cast<int>(::ERR_get_error()), ::asio::error::get_ssl_category()};
+      co_return ec;
+    }
   }
   auto [connect_ec] = co_await tls_socket_.next_layer().async_connect(
       endpoint, ::asio::experimental::as_tuple(::asio::use_awaitable));
   if (connect_ec) {
     co_return connect_ec;
   }
+
   co_return co_await ClientHandshake();
+}
+
+asio::awaitable<std::error_code> TlsSocket::AsyncConnect(const std::string& host, uint16_t port) {
+  ::asio::ip::tcp::endpoint endpoint;
+  auto ec = co_await resolve_endpoint(host, port, &endpoint);
+  if (ec) {
+    co_return ec;
+  }
+  co_return co_await AsyncConnect(endpoint);
 }
 
 asio::awaitable<IOResult> TlsSocket::AsyncRead(const asio::mutable_buffer& buffers) {

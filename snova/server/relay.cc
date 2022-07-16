@@ -48,7 +48,7 @@ template <typename T>
 static asio::awaitable<void> do_relay(T& local_stream, const Bytes& readed_data,
                                       RelayContext& relay_ctx) {
   TransferRoutineFunc transfer_routine;
-  uint32_t latest_io_time = time(nullptr);
+  uint64_t latest_io_time = time(nullptr);
   CancelFunc cancel_transfer_timeout;
   CloseFunc close_local;
   uint32_t stream_id = 0;
@@ -73,7 +73,7 @@ static asio::awaitable<void> do_relay(T& local_stream, const Bytes& readed_data,
           co_await close_local();
           co_return;
         },
-        [&]() -> uint32_t { return latest_io_time; }, g_stream_io_timeout_secs);
+        [&]() -> uint64_t { return latest_io_time * 1000; }, g_stream_io_timeout_secs * 1000);
   }
 
   absl::Cleanup auto_cancel_timeout = [&cancel_transfer_timeout] {
