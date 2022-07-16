@@ -60,7 +60,9 @@ if [ $retval -ne 0 ]; then
   exit 1
 fi
 
-tar cjf snova_asio_"${BUILD_VERSION}"_"${machine}"_"${arch}".tar.bz2 -C ./bazel-bin/snova/app/ snova
+tar -cjf snova_asio_"${BUILD_VERSION}"_"${machine}"_"${arch}".tar.bz2 -C ./bazel-bin/snova/app/ snova
+# ls -l ./bazel-bin/snova/app/snova
+# ls -l snova_asio_"${BUILD_VERSION}"_"${machine}"_"${arch}".tar.bz2
 
 
 
